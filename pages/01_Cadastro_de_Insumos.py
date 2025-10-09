@@ -192,28 +192,46 @@ def form_insumo(initial: dict | None, is_edit: bool):
             tipo = st.selectbox("Tipo", ["Comprado", "Produzido no restaurante"], index=0 if dat["tipo"] != "Produzido no restaurante" else 1)
 
         with c2:
+            # ============ BLOCO DE UNIDADE E QTDE AUTOMÁTICA ============
             un_label_sel = st.selectbox(
                 "Unidade de medida",
                 options=unidades_labels,
-                index=unidades_df.index[unidades_df["codigo"]==dat["un_med"]].tolist()[0]
-                if dat["un_med"] in unidades_df["codigo"].tolist() else 0
+                index=unidades_df.index[unidades_df["codigo"] == dat["un_med"]].tolist()[0]
+                if dat["un_med"] in unidades_df["codigo"].tolist() else 0,
+                key="un_med_select"
             )
             un_med = map_label_to_code[un_label_sel]
 
-            quantidade_compra = st.number_input("Quantidade comprada", value=float(dat["quantidade_compra"]), min_value=0.0, step=0.01)
+            if "last_un_med" not in st.session_state:
+                st.session_state.last_un_med = un_med
 
-            # Quantidade para custos automática
-            if un_med in ["MIL", "CT", "DZ"]:
-                auto_valor = {"MIL": 1000, "CT": 100, "DZ": 12}[un_med]
-            else:
+            auto_valor = map_code_to_qpad.get(un_med, 1.0)
+            if pd.isna(auto_valor):
                 auto_valor = 1.0
+
+            if un_med != st.session_state.last_un_med:
+                st.session_state.qtde_para_custos = auto_valor
+                st.session_state.last_un_med = un_med
+            else:
+                if "qtde_para_custos" not in st.session_state:
+                    st.session_state.qtde_para_custos = dat.get("qtde_para_custos", auto_valor)
+
+            quantidade_compra = st.number_input(
+                "Quantidade comprada",
+                value=float(dat["quantidade_compra"]),
+                min_value=0.0,
+                step=0.01
+            )
+
             qtde_para_custos = st.number_input(
                 "Quantidade para custos",
-                value=float(dat.get("qtde_para_custos", auto_valor) or auto_valor),
+                value=float(st.session_state.qtde_para_custos),
                 min_value=0.0,
                 step=1.0,
+                key="qtde_para_custos_input",
                 help="Preenchida automaticamente conforme unidade padrão (MIL=1000, CT=100, DZ=12)."
             )
+            # ===========================================================
 
         st.markdown("---")
         st.subheader("💰 Custos e ajustes")
@@ -224,36 +242,25 @@ def form_insumo(initial: dict | None, is_edit: bool):
         with c4:
             valor_frete = st.number_input("Frete (R$)", value=float(dat["valor_frete"]), min_value=0.0, step=0.01)
         with c5:
-            percentual_perda = st.number_input(
-                "% de perda", value=float(dat["percentual_perda"]),
-                min_value=0.0, max_value=100.0, step=0.5,
-                help="Perda (limpeza, aparas, evaporação, etc.)"
-            )
+            percentual_perda = st.number_input("% de perda", value=float(dat["percentual_perda"]), min_value=0.0, max_value=100.0, step=0.5)
 
-        # cálculos
         valor_unit_bruto, custo_total_com_frete, qtd_liq, custo_real_unit, valor_unit_custos = calc_preview(
             quantidade_compra, valor_total_compra, valor_frete, percentual_perda, qtde_para_custos
         )
 
         st.markdown("#### 📊 Pré-visualização")
-        lcol, rcol = st.columns(2)
-        with lcol:
-            st.write(f"• Valor unitário bruto: **R$ {valor_unit_bruto:.4f}**")
-            st.write(f"• Custo total com frete: **R$ {custo_total_com_frete:.2f}**")
-            st.write(f"• Quantidade líquida (após perda): **{qtd_liq:.4f} {un_med}**")
-        with rcol:
-            st.write(f"• Custo real unitário: **R$ {custo_real_unit:.6f}**")
-            st.write(f"• Custo unitário p/ custos: **R$ {valor_unit_custos:.6f}**")
+        st.write(f"• Valor unitário bruto: **R$ {valor_unit_bruto:.4f}**")
+        st.write(f"• Custo total com frete: **R$ {custo_total_com_frete:.2f}**")
+        st.write(f"• Quantidade líquida (após perda): **{qtd_liq:.4f} {un_med}**")
+        st.write(f"• Custo real unitário: **R$ {custo_real_unit:.6f}**")
+        st.write(f"• Custo unitário p/ custos: **R$ {valor_unit_custos:.6f}**")
 
         st.markdown("---")
         st.subheader("📇 Fornecedor e contato")
-        f1, f2 = st.columns(2)
-        with f1:
-            fornecedor = st.text_input("Fornecedor", value=dat["fornecedor"])
-            representante = st.text_input("Representante", value=dat["representante"])
-        with f2:
-            fone_fornecedor = st.text_input("Fone do fornecedor", value=dat["fone_fornecedor"])
-            documento = st.text_input("Documento / Nota Fiscal", value=dat["documento"])
+        fornecedor = st.text_input("Fornecedor", value=dat["fornecedor"])
+        representante = st.text_input("Representante", value=dat["representante"])
+        fone_fornecedor = st.text_input("Fone do fornecedor", value=dat["fone_fornecedor"])
+        documento = st.text_input("Documento / Nota Fiscal", value=dat["documento"])
         observacao = st.text_area("Observação", value=dat["observacao"])
 
         enviado = st.form_submit_button("💾 Salvar alterações" if is_edit else "💾 Salvar insumo")
