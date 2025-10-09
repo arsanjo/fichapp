@@ -1,41 +1,57 @@
 import streamlit as st
-from utilitários.theme import aplicar_tema, carregar_versao, rodape
+from utils.theme import aplicar_tema, carregar_versao, rodape
 
-# ========================
-# CONFIGURAÇÕES E TEMA
-# ========================
+# ============================
+# Configuração e layout base
+# ============================
+
+# Aplica o tema escuro global
 aplicar_tema()
-versao = carregar_versao()
 
-# ========================
-# MENU LATERAL
-# ========================
-with st.sidebar:
-    st.header("📋 Menu Principal")
-    st.radio("Selecione uma categoria:", ["🏠 Início", "📦 Cadastros", "📊 Relatórios"], index=0)
+# Carrega a versão atual
+versao = carregar_versao("versao.json")
 
-# ========================
-# CONTEÚDO PRINCIPAL
-# ========================
-st.title("FichApp")
-st.caption("Gestão inteligente de fichas técnicas e custos gastronômicos")
+# Barra lateral (menu principal)
+st.sidebar.title("📋 Menu Principal")
+menu = st.sidebar.radio("Selecione uma categoria:", ["🏠 Início", "📦 Cadastros", "📊 Relatórios"])
 
-st.divider()
-st.subheader("📂 Módulos disponíveis")
+# ============================
+# Páginas principais
+# ============================
 
-col1, col2 = st.columns(2)
+if menu == "🏠 Início":
+    st.title("FichApp")
+    st.markdown("### Gestão inteligente de fichas técnicas e custos gastronômicos")
+    st.write("---")
 
-with col1:
-    st.page_link("páginas/01_📦_Cadastro_de_Insumos.py", label="📦 Cadastro de Insumos")
-    st.page_link("páginas/02_🧪_Ficha_Técnica.py", label="🧪 Ficha Técnica")
+    st.subheader("Bem-vindo ao FichApp 👋")
+    st.markdown("""
+    O **FichApp** é um sistema profissional de gestão gastronômica que permite:
+    - Cadastrar e gerenciar insumos
+    - Montar fichas técnicas completas
+    - Calcular custos e rendimentos
+    - Gerar relatórios inteligentes de desempenho e margem  
+      
+    Use o menu lateral para navegar entre as seções.
+    """)
 
-with col2:
-    st.markdown("**📊 Relatórios (em breve)**")
-    st.markdown("**⚙️ Configurações (em breve)**")
+elif menu == "📦 Cadastros":
+    st.title("📦 Cadastros")
+    st.markdown("Selecione o módulo desejado na barra superior:")
+    st.markdown("- [Cadastro de Insumos](pages/01_📦_Cadastro_de_Insumos.py)")
+    st.markdown("- [Ficha Técnica](pages/02_🧪_Ficha_Tecnica.py) *(em breve)*")
 
-st.divider()
+elif menu == "📊 Relatórios":
+    st.title("📊 Relatórios")
+    st.info("Em desenvolvimento...")
 
-# ========================
-# RODAPÉ
-# ========================
-rodape(versao)
+# ============================
+# Rodapé e versão
+# ============================
+st.write("---")
+st.markdown(
+    f"**FichApp v{versao['versao']}** — última atualização: {versao['data_lancamento']}"
+)
+st.markdown("> _“Sede fortes e corajosos.” — Josué 1:9_")
+
+rodape()
