@@ -1,4 +1,4 @@
-# utils/nav.py - CÓDIGO CORRIGIDO PARA NAVEGAÇÃO INTERNA
+# utils/nav.py - CORRIGIDO PARA EXIBIR A LOGO FICHAPP
 
 import streamlit as st
 
@@ -19,6 +19,11 @@ def sidebar_menu(ativo="home"):
     # 1. Inicializa o estado da página se ainda não existir
     if 'current_page' not in st.session_state:
         st.session_state.current_page = ativo
+    
+    # === ADICIONA A LOGOMARCA FichApp NO TOPO DO MENU LATERAL ===
+    # CORREÇÃO: Usando o nome do arquivo que está na pasta assets/
+    st.sidebar.image("assets/logo_fichapp.png", use_column_width="always")
+    # =============================================================
 
     st.sidebar.markdown("---")
     
@@ -31,13 +36,12 @@ def sidebar_menu(ativo="home"):
 
     # 3. Botões das Páginas Secundárias
     for label, filename in MENU_PAGES.items():
-        # A chave usada para st.session_state será o próprio nome do arquivo
         page_key = filename
         
         # Cria o botão e verifica o clique
         if st.sidebar.button(label, key=f"nav_{page_key}"):
             st.session_state.current_page = page_key
-            st.rerun() # Recarrega a página para exibir o novo conteúdo
+            st.rerun() 
             
     st.sidebar.markdown("---") 
     st.sidebar.markdown("Desenvolvido por Arsanjo")
