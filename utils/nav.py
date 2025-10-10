@@ -1,94 +1,51 @@
+# utils/nav.py
+# ---------------------------------------------------------
+# Menu lateral fixo do FichApp (não desenha nada no corpo)
+# ---------------------------------------------------------
+import os
 import streamlit as st
+from PIL import Image
 
-# =========================================================
-# MENU LATERAL — versão otimizada com cache
-# =========================================================
-@st.cache_resource
-def sidebar_menu(ativo: str = None):
+def sidebar_menu(ativo: str = "home"):
     """
-    Renderiza o menu lateral fixo do FichApp com cache.
-    O parâmetro 'ativo' serve para destacar a página atual.
+    Desenha somente o menu lateral do FichApp.
+    NÃO renderiza atalhos/menus no corpo da página.
     """
-
-    # Define estilo personalizado do menu
-    st.markdown("""
+    # Ajustes de espaçamento do sidebar
+    st.markdown(
+        """
         <style>
-            /* Remove barra superior automática do Streamlit */
-            header {visibility: hidden;}
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-
-            /* Estilo do menu lateral */
-            section[data-testid="stSidebar"] {
-                background-color: #f7f8fa;
-                border-right: 1px solid #e0e0e0;
-            }
-
-            .menu-item {
-                padding: 0.5rem 0.75rem;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                font-size: 0.95rem;
-                font-weight: 500;
-                margin-bottom: 0.3rem;
-                color: #333;
-                text-decoration: none;
-            }
-            .menu-item:hover {
-                background-color: #e8f0fe;
-                color: #0b57d0;
-            }
-            .menu-item.active {
-                background-color: #0b57d0;
-                color: white !important;
-                font-weight: 600;
-            }
-
-            .menu-icon {
-                margin-right: 8px;
-                font-size: 1.1rem;
-            }
-
-            .menu-footer {
-                margin-top: 1rem;
-                font-size: 0.75rem;
-                color: #999;
-                text-align: center;
-            }
+        section[data-testid="stSidebar"] {padding-top: 0.25rem !important;}
         </style>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
-    # =========================================================
-    # CONTEÚDO DO MENU
-    # =========================================================
-    with st.sidebar:
-        st.markdown("### 📘 FichApp")
-        st.markdown("Menu principal")
-        st.write("")
+    sb = st.sidebar
 
-        # Itens do menu
-        menu_itens = {
-            "home": {"nome": "Início", "icone": "🏠", "link": "Home"},
-            "insumos": {"nome": "Cadastro de Insumos", "icone": "📦", "link": "Cadastro_de_Insumos"},
-            "financeiros": {"nome": "Parâmetros Financeiros", "icone": "💰", "link": "Parametros_Financeiros"},
-            "engenharia": {"nome": "Engenharia do Cardápio", "icone": "📊", "link": "Engenharia_do_Cardapio"},
-            "ficha_tecnica_cozinha": {"nome": "Ficha Técnica (Cozinha)", "icone": "👨‍🍳", "link": "Ficha_Tecnica_Cozinha"},
-            "ficha_tecnica_admin": {"nome": "Ficha Técnica (Administrativa)", "icone": "📈", "link": "Ficha_Tecnica_Administrativa"},
-        }
+    # Logo (opcional)
+    logo_path = os.path.join("assets", "logo_fichapp.png")
+    if os.path.exists(logo_path):
+        try:
+            sb.image(Image.open(logo_path), use_container_width=True)
+        except Exception:
+            sb.image(logo_path, use_container_width=True)
 
-        # Renderização dos links com destaque dinâmico
-        for chave, item in menu_itens.items():
-            classe = "menu-item"
-            if ativo == chave:
-                classe += " active"
+    sb.markdown("### 📘 FichApp")
+    sb.caption("Menu principal")
+    sb.write("")
 
-            st.markdown(
-                f"<a href='/{item['link']}' target='_self' class='{classe}'>"
-                f"<span class='menu-icon'>{item['icone']}</span>{item['nome']}</a>",
-                unsafe_allow_html=True
-            )
+    # Helper para links
+    def link(path: str, label: str, emoji: str):
+        # st.page_link garante navegação entre as páginas (Streamlit 1.31+)
+        sb.page_link(path, label=f"{emoji} {label}")
 
-        # Rodapé do menu
-        st.markdown("<hr>", unsafe_allow_html=True)
-        st.markdown("<div class='menu-footer'>FichApp v1.0.0</div>", unsafe_allow_html=True)
+    # Navegação
+    link("streamlit_app.py", "Início", "🏠")
+    link("pages/01_Cadastro_de_Insumos.py", "Cadastro de Insumos", "📦")
+    link("pages/02_Parametros_Financeiros.py", "Parâmetros Financeiros", "💰")
+    link("pages/03_Engenharia_do_Cardapio.py", "Engenharia do Cardápio", "📊")
+    link("pages/04_Ficha_Tecnica.py", "Ficha Técnica", "🧾")
+
+    sb.markdown("---")
+    sb.caption("FichApp v1.0.0")
