@@ -1,41 +1,41 @@
 import streamlit as st
 
-# ============================================================
-# MENU LATERAL FIXO - FichApp
-# ============================================================
+# ======================================================
+# MENU LATERAL PRINCIPAL — FichApp
+# ======================================================
+
 def sidebar_menu(ativo="inicio"):
-    with st.sidebar:
-        # LOGO E TÍTULO
-        st.markdown("## 🧾 FichApp")
-        st.markdown("### Menu")
-        st.markdown("---")
+    st.sidebar.markdown("<h3 style='margin-bottom: 0;'>📘 FichApp</h3>", unsafe_allow_html=True)
+    st.sidebar.markdown("<small>Menu principal</small>", unsafe_allow_html=True)
+    st.sidebar.markdown("---")
 
-        # =========================
-        # LINKS DE NAVEGAÇÃO
-        # =========================
-        st.page_link(
-            "streamlit_app.py",
-            label="🏠 Início",
-            disabled=(ativo == "inicio")
+    # Lista de itens do menu
+    menu_itens = {
+        "inicio": {"icon": "🏠", "label": "Início", "link": "/"},
+        "insumos": {"icon": "📦", "label": "Cadastro de Insumos", "link": "/Cadastro_de_Insumos"},
+        "parametros": {"icon": "💰", "label": "Parâmetros Financeiros", "link": "/Parametros_Financeiros"},
+        "engenharia": {"icon": "📊", "label": "Engenharia do Cardápio", "link": "/Engenharia_do_Cardapio"},
+        "ficha_tecnica": {"icon": "🧾", "label": "Ficha Técnica", "link": "/Ficha_Tecnica"},
+    }
+
+    # Renderização do menu
+    for chave, item in menu_itens.items():
+        estilo = (
+            "background-color:#0f172a; color:white; border-radius:8px; padding:6px 12px;"
+            if chave == ativo
+            else "padding:6px 12px; color:#333;"
+        )
+        st.sidebar.markdown(
+            f"""
+            <a href="{item['link']}" target="_self" style="text-decoration:none;">
+                <div style="{estilo}">{item['icon']} {item['label']}</div>
+            </a>
+            """,
+            unsafe_allow_html=True,
         )
 
-        st.page_link(
-            "pages/01_Cadastro_de_Insumos.py",
-            label="📦 Cadastro de Insumos",
-            disabled=(ativo == "insumos")
-        )
-
-        st.page_link(
-            "pages/02_💰_Parametros_Financeiros.py",
-            label="💰 Parâmetros Financeiros",
-            disabled=(ativo == "parametros")
-        )
-
-        st.page_link(
-            "pages/03_📊_Engenharia_do_Cardapio.py",
-            label="📊 Engenharia do Cardápio",
-            disabled=(ativo == "engenharia")
-        )
-
-        st.markdown("---")
-        st.caption("Navegação fixa • FichApp v1.0.0")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(
+        "<p style='text-align:center; font-size:0.8rem; opacity:.7;'>FichApp v1.0.0</p>",
+        unsafe_allow_html=True,
+    )
