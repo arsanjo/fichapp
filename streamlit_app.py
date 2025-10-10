@@ -1,4 +1,4 @@
-# streamlit_app.py - COM CORREÇÃO DA LOGO NO DASHBOARD
+# streamlit_app.py - CÓDIGO FINAL COM CONTEÚDO DA HOME ISOLADO
 
 # =========================================================
 # FichApp - Sistema de controle de fichas técnicas e insumos
@@ -17,10 +17,10 @@ def load_page_content(page_key):
     if page_key == "home":
         # === CONTEÚDO MELHORADO DA HOME (DASHBOARD) ===
         
+        # O título já está na Home (no código original)
         # Centraliza a logomarca no cabeçalho
         col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
         with col_img2:
-            # CORREÇÃO: Exibe a logomarca do FichApp no centro da página
             st.image("assets/logo_fichapp.png", use_column_width=True)
 
         st.markdown("<h1 style='text-align: center;'>FichApp Dashboard</h1>", unsafe_allow_html=True)
@@ -35,7 +35,6 @@ def load_page_content(page_key):
         
         col1, col2, col3 = st.columns(3)
         
-        # Nota: Estes valores são fixos para demonstração. Serão ligados aos dados na próxima fase.
         with col1:
             st.metric(label="Total de Fichas Criadas", value="24", delta="🚀 +2 Fichas")
         with col2:
@@ -51,7 +50,6 @@ def load_page_content(page_key):
 
         col_btn1, col_btn2, col_btn3 = st.columns(3)
         
-        # Botões de navegação rápida
         with col_btn1:
             if st.button("📦 Ir para Cadastro de Insumos", use_container_width=True):
                 st.session_state.current_page = "01_Cadastro_de_Insumos.py"
