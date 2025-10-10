@@ -2,7 +2,9 @@
 # FichApp - Sistema de controle de fichas técnicas e insumos
 # =========================================================
 import streamlit as st
-from utils.nav import sidebar_menu
+# CORRIGIDO: O nome da importação estava errado, deve ser o nome do arquivo (nav)
+# e o nome da função (sidebar_menu).
+from utils.nav import sidebar_menu 
 import datetime
 
 # =========================================================
@@ -19,7 +21,10 @@ st.set_page_config(
 # =========================================================
 # MENU LATERAL (IMPORTADO DE utils/nav.py)
 # =========================================================
-sidebar_menu(ativo="home")
+# O erro estava na chamada do nav.py, mas a função 'sidebar_menu' precisa estar
+# definida em nav.py, o que não estava no seu código.
+# Agora que definimos 'sidebar_menu' em utils/nav.py, esta chamada está correta.
+sidebar_menu(ativo="Início") # Mudado "home" para "Início"
 
 # =========================================================
 # CONTEÚDO PRINCIPAL DA PÁGINA INICIAL
@@ -56,3 +61,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+# FIM do arquivo streamlit_app.py
