@@ -1,102 +1,93 @@
-# pages/04_Ficha_Tecnica.py
 import streamlit as st
+from datetime import date
 from utils.nav import sidebar_menu
 
-# Página: Ficha Técnica
-st.set_page_config(page_title="FichApp — Ficha Técnica", page_icon="🧾", layout="centered")
-
 # Menu lateral fixo
-sidebar_menu(ativo="ficha_tecnica")
+sidebar_menu(ativo="ficha_tecnica_cozinha")
 
-# ====== Estilo (leve) ======
-CSS = """
-h1,h2,h3{ font-weight:700; }
-.card{
-  border:1px solid #e9eef5; border-radius:14px; padding:18px 18px; background:#fff; 
-  box-shadow:0 1px 0 rgba(0,0,0,.02); margin-bottom:16px;
-}
-.badge{ 
-  background:#0f172a; color:#fff; font-size:.80rem; border-radius:6px; padding:.2rem .45rem; 
-}
-.note{
-  font-size:.92rem; color:#475569;
-}
-.grid{
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-@media (max-width: 900px){
-  .grid{ grid-template-columns: 1fr; }
-}
-"""
-st.markdown(f"<style>{CSS}</style>", unsafe_allow_html=True)
+# =========================================
+# CONFIGURAÇÕES GERAIS DA PÁGINA
+# =========================================
+st.set_page_config(page_title="Ficha Técnica - Cozinha", layout="wide")
 
-# ====== Cabeçalho ======
-st.title("Ficha Técnica")
-st.caption("Estrutura dividida em duas partes: **Cozinha** e **Administrativa (Cálculos)**.")
+# =========================================
+# CABEÇALHO
+# =========================================
+st.markdown("<h2 style='text-align:center;'>📘 FICHA TÉCNICA - COZINHA</h2>", unsafe_allow_html=True)
+st.markdown("---")
 
-st.markdown(
-    """
-**Objetivo:** a ficha técnica será separada para atender públicos diferentes:
+col1, col2, col3 = st.columns([1, 1, 1])
+with col1:
+    referencia = st.text_input("Referência", value="")
+    derivacao = st.text_input("Derivação", value="")
+with col2:
+    produto = st.text_input("Produto", value="")
+    eng_cardapio = st.text_input("Engenharia de Cardápio", value="")
+with col3:
+    cod_sistema = st.text_input("Código Sistema", value="")
+    rendimento = st.text_input("Rendimento (ex: 8 peças)", value="")
 
-- **Parte da Cozinha:** preparo, rendimento, utensílios, modo de fazer, fotos e observações técnicas.  
-- **Parte Administrativa:** custos, percentuais, impostos, margem, preço sugerido, etc.
+st.text_area("Descrição do Produto", placeholder="Descreva brevemente o produto e seu preparo...")
 
-Na hora de **imprimir** ou **exportar para PDF**, o sistema permitirá escolher:
-- **Ficha Completa**
-- **Somente Cozinha**
-- **Somente Administrativa**
-"""
+# Upload da foto do produto
+foto = st.file_uploader("📸 Foto do Produto", type=["jpg", "png", "jpeg"])
+if foto:
+    st.image(foto, use_container_width=True)
+
+st.markdown("---")
+
+# =========================================
+# MODO DE PREPARO
+# =========================================
+st.subheader("🧑‍🍳 Modo de Preparo")
+modo_preparo = st.text_area(
+    "Descreva detalhadamente o modo de preparo:",
+    height=200,
+    placeholder="Ex: Colocar o arroz na alga; espalhar o cream cheese; adicionar o salmão..."
 )
 
-# ====== Cartões explicativos ======
-st.markdown("### O que vai em cada parte")
-st.markdown("<div class='grid'>", unsafe_allow_html=True)
+video = st.text_input("🎥 Link de vídeo explicativo (opcional)", placeholder="Cole aqui o link do vídeo")
 
-with st.container():
-    st.markdown(
-        """
-        <div class='card'>
-          <h3>🍳 Parte da Cozinha <span class='badge'>produção</span></h3>
-          <ul>
-            <li>Nome da receita e categoria</li>
-            <li>Rendimento e porcionamento</li>
-            <li>Lista de insumos (com unidades e quantidades)</li>
-            <li>Equipamentos/utensílios utilizados</li>
-            <li>Passo a passo do preparo</li>
-            <li>Tempo de preparo e tempo total</li>
-            <li>Observações técnicas (armazenagem, cocção, etc.)</li>
-            <li>Fotos (opcional)</li>
-          </ul>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+st.markdown("---")
 
-with st.container():
-    st.markdown(
-        """
-        <div class='card'>
-          <h3>📈 Parte Administrativa <span class='badge'>cálculos</span></h3>
-          <ul>
-            <li>Custo por insumo e custo total</li>
-            <li>Perdas, frete, taxas, impostos</li>
-            <li>Margem, markup e preço sugerido</li>
-            <li>Indicadores (contribuição, CMV, etc.)</li>
-            <li>Parâmetros financeiros vinculados (comissão, taxas, etc.)</li>
-          </ul>
-          <p class='note'>
-            <strong>Observação:</strong> Esta seção é sensível e não será exibida para a equipe da cozinha.
-          </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+# =========================================
+# DETALHAMENTO DO PREPARO
+# =========================================
+st.subheader("📋 Detalhamento do Preparo")
 
-st.markdown("</div>", unsafe_allow_html=True)
+with st.expander("Adicionar Ingredientes"):
+    st.markdown("Preencha os campos abaixo para cada item utilizado no preparo:")
 
-st.info(
-    "🧪 **Status:** protótipo funcional da página. Na próxima etapa, "
-    "vamos criar os formulários, persistência e a exportação seletiva (completa / cozinha / administrativa)."
+    col1, col2, col3, col4, col5 = st.columns([1.5, 2.5, 1, 1, 2])
+    col1.text_input("Etapa", placeholder="Ex: Preparo")
+    col2.text_input("Produto", placeholder="Ex: Arroz japonês")
+    col3.text_input("Unidade", placeholder="Kg / Un / Pc")
+    col4.number_input("Qtd.", min_value=0.0, step=0.001, format="%.3f")
+    col5.text_input("Observação", placeholder="Opcional")
+
+st.info("💡 Em versões futuras, esta tabela será preenchida automaticamente a partir dos insumos cadastrados.")
+
+st.markdown("---")
+
+# =========================================
+# OBSERVAÇÕES
+# =========================================
+st.subheader("🗒️ Observações Gerais")
+st.text_area("Anotações, dicas ou cuidados importantes", height=120)
+
+st.markdown("---")
+
+# =========================================
+# RODAPÉ
+# =========================================
+col1, col2 = st.columns([2, 1])
+with col1:
+    st.write("**Revisado por:** Arsanjo Paul Colaço")
+with col2:
+    st.write(f"**Data:** {date.today().strftime('%d/%m/%Y')}")
+
+st.markdown(
+    "<p style='font-size: 0.8rem; color: red;'>Essa ficha técnica é de uso exclusivo da Pureto. "
+    "É vedada sua reprodução ou compartilhamento por qualquer meio que seja.</p>",
+    unsafe_allow_html=True
 )
