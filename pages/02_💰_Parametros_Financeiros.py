@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
-import os
-from datetime import datetime
-from utils.nav import menu_lateral
-menu_lateral()
+from datetime import datetime, date
+import os, json, random
+from utils.nav import sidebar_menu
+
+# ativa o menu lateral fixo padronizado
+sidebar_menu(ativo="insumos")
 
 # =========================================================
 # CONFIGURAÇÃO E ESTILO
