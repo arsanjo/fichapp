@@ -8,7 +8,7 @@ def link(path: str, label: str, emoji: str = ""):
     Cria um link lateral com ícone e texto para cada página.
     """
     st.sidebar.page_link(
-        path,
+        f"./{path}",
         label=f"{emoji} {label}" if emoji else label
     )
 
@@ -35,5 +35,4 @@ def sidebar_menu(ativo: str = "home"):
 
         # RODAPÉ
         st.markdown("---")
-        st.markdown("##### FichApp v1.0.0")
-        st.caption("Desenvolvido por Arsanjo")
+        st.caption("FichApp v1.0.0 | Desenvolvido por Arsanjo")
