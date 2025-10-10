@@ -1,121 +1,73 @@
 import streamlit as st
 from PIL import Image
-import json
-import os
+import json, os
 from datetime import date
-from utils.nav import menu_lateral
+from utils.nav import sidebar_menu
 
 # ==============================
-# CONFIGURAÇÃO GERAL DA PÁGINA
+# CONFIG GLOBAL
 # ==============================
 st.set_page_config(
     page_title="FichApp",
     page_icon="📘",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# ==============================
-# REMOVER MENUS PADRÕES COMPLETAMENTE
-# ==============================
-hide_all_default_menus = """
-    <style>
-        /* Remove o menu padrão do Streamlit (streamlit app e páginas) */
-        section[data-testid="stSidebarNav"] {
-            display: none !important;
-            visibility: hidden !important;
-            height: 0 !important;
-            overflow: hidden !important;
-        }
-
-        /* Remove o rodapé padrão de navegação fixa */
-        div[data-testid="stSidebarFooter"] {
-            display: none !important;
-            visibility: hidden !important;
-            height: 0 !important;
-        }
-
-        /* Remove linhas separadoras e espaçamentos extras */
-        [data-testid="stSidebar"] hr {
-            display: none !important;
-        }
-
-        /* Remove o título automático (streamlit app) */
-        [data-testid="stSidebarNav"] > div:first-child {
-            display: none !important;
-        }
-
-        /* Ajusta tamanho e layout do nosso menu personalizado */
-        [data-testid="stSidebar"] {
-            min-width: 270px;
-            background-color: #f5f6fa;
-        }
-    </style>
-"""
-st.markdown(hide_all_default_menus, unsafe_allow_html=True)
+# nosso menu único
+sidebar_menu(ativo="inicio")
 
 # ==============================
-# MENU FIXO PERSONALIZADO
-# ==============================
-menu_lateral()
-
-# ==============================
-# CONTEÚDO PRINCIPAL (TELA INICIAL)
+# CONTEÚDO DA HOME
 # ==============================
 col1, col2, col3 = st.columns([1, 2, 1])
 
 logo_path = os.path.join("assets", "logo_fichapp.png")
 with col2:
     if os.path.exists(logo_path):
-        logo = Image.open(logo_path)
-        st.image(logo, use_container_width=True)
-    
-    # Nome e subtítulo
+        st.image(Image.open(logo_path), use_container_width=True)
+
     st.markdown(
         """
-        <h1 style='text-align:center; margin-top:-10px;'>📘 FichApp</h1>
-        <p style='text-align:center; color:gray; font-size:18px;'>Sistema de controle de fichas técnicas e insumos</p>
+        <h1 style='text-align:center;margin-top:-8px;'>FichApp</h1>
+        <p style='text-align:center;color:#6b7280;font-size:18px;margin-top:-8px'>
+          Sistema de controle de fichas técnicas e insumos
+        </p>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
-    # Versículo bíblico
     st.markdown(
         """
-        <div style='margin-top:40px; text-align:center; font-style:italic; color:#333; font-size:17px; animation: fadeIn 2s ease-in-out;'>
-            “E tudo quanto fizerdes, fazei-o de todo o coração, como ao Senhor, e não aos homens.”<br>
-            <b>Colossenses 3:23</b>
+        <div style='margin-top:36px;text-align:center;font-style:italic;color:#374151;font-size:17px;'>
+          “E tudo quanto fizerdes, fazei-o de todo o coração, como ao Senhor, e não aos homens.”<br>
+          <b>Colossenses 3:23</b>
         </div>
-        <style>
-            @keyframes fadeIn {
-                from {opacity: 0;}
-                to {opacity: 1;}
-            }
-        </style>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
 # ==============================
-# RODAPÉ
+# RODAPÉ COM VERSÃO
 # ==============================
 def rodape():
-    if os.path.exists("version.json"):
-        with open("version.json", "r", encoding="utf-8") as f:
-            versao_info = json.load(f)
-        versao = versao_info.get("version", "1.0.0")
-        data = versao_info.get("last_update", str(date.today()))
-    else:
-        versao, data = "1.0.0", str(date.today())
+    versao, data = "1.0.0", str(date.today())
+    try:
+        with open("version.json","r",encoding="utf-8") as f:
+            info = json.load(f)
+        versao = info.get("version", versao)
+        data   = info.get("last_update", data)
+    except Exception:
+        pass
 
     st.markdown(
         f"""
-        <div style='margin-top:70px; padding:12px; background-color:#0b1220; color:white; text-align:center; border-radius:10px;'>
-        <b>FichApp v{versao}</b> — atualizado em {data}<br>
-        Desenvolvido por <b>Arsanjo</b>
+        <div style='margin-top:60px;padding:12px;background:#0b1220;color:#fff;text-align:center;border-radius:10px;'>
+            <b>FichApp v{versao}</b> — atualizado em {data}<br>
+            Desenvolvido por <b>Arsanjo</b>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
 rodape()
