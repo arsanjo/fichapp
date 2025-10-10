@@ -16,13 +16,11 @@ st.set_page_config(
 )
 
 # ==============================
-# ESCONDER MENU PADRÃO (antes de tudo)
+# ESCONDER MENU PADRÃO
 # ==============================
 hide_default_menu = """
     <style>
-        /* Remove completamente o menu padrão de navegação */
         section[data-testid="stSidebarNav"] {display: none !important;}
-        /* Garante que a sidebar permaneça aberta e limpa */
         [data-testid="stSidebar"] {
             min-width: 270px;
         }
@@ -36,7 +34,7 @@ st.markdown(hide_default_menu, unsafe_allow_html=True)
 menu_lateral()
 
 # ==============================
-# CONTEÚDO DA PÁGINA INICIAL
+# CONTEÚDO PRINCIPAL
 # ==============================
 col1, col2, col3 = st.columns([1, 2, 1])
 
@@ -45,28 +43,29 @@ with col2:
     if os.path.exists(logo_path):
         logo = Image.open(logo_path)
         st.image(logo, use_container_width=True)
-    st.markdown("<h1 style='text-align:center; margin-top:-10px;'>📘 FichApp</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; color:gray;'>Sistema de controle de fichas técnicas e insumos</p>", unsafe_allow_html=True)
+    
+    # Nome e subtítulo
+    st.markdown(
+        """
+        <h1 style='text-align:center; margin-top:-10px;'>📘 FichApp</h1>
+        <p style='text-align:center; color:gray; font-size:18px;'>Sistema de controle de fichas técnicas e insumos</p>
+        """,
+        unsafe_allow_html=True
+    )
 
-st.divider()
-
-st.info(
-    "🚀 O **FichApp** está em construção. Em breve você poderá cadastrar insumos, "
-    "criar fichas técnicas e acompanhar custos em tempo real."
-)
-
-st.markdown(
-    """
-    ### 🧭 Primeiros passos
-
-    1️⃣ **Cadastre seus insumos** em “Cadastro de Insumos”.  
-    2️⃣ **Defina parâmetros financeiros** na aba “Parâmetros Financeiros”.  
-    3️⃣ Aguarde o próximo módulo com **Fichas Técnicas e Cálculo de Custos**.
-    """
-)
+    # Versículo bíblico
+    st.markdown(
+        """
+        <div style='margin-top:40px; text-align:center; font-style:italic; color:#333; font-size:17px;'>
+            “E tudo quanto fizerdes, fazei-o de todo o coração, como ao Senhor, e não aos homens.”<br>
+            <b>Colossenses 3:23</b>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # ==============================
-# RODAPÉ COM VERSÃO E AUTOR
+# RODAPÉ
 # ==============================
 def rodape():
     if os.path.exists("version.json"):
@@ -79,7 +78,7 @@ def rodape():
 
     st.markdown(
         f"""
-        <div style='margin-top:50px; padding:12px; background-color:#0b1220; color:white; text-align:center; border-radius:10px;'>
+        <div style='margin-top:70px; padding:12px; background-color:#0b1220; color:white; text-align:center; border-radius:10px;'>
         <b>FichApp v{versao}</b> — atualizado em {data}<br>
         Desenvolvido por <b>Arsanjo</b>
         </div>
