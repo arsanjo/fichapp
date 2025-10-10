@@ -1,26 +1,41 @@
-# utils/nav.py
 import streamlit as st
 
-def _css_sidebar():
-    st.markdown(
-        """
-        <style>
-        [data-testid="stSidebar"]{min-width:270px; background:#f5f6fa;}
-        [data-testid="stSidebar"] h3{margin-top:.5rem; margin-bottom:.2rem;}
-        [data-testid="stSidebar"] .subtle{color:#6b7280; font-size:12px; margin:6px 0 10px;}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+# ============================================================
+# MENU LATERAL FIXO - FichApp
+# ============================================================
+def sidebar_menu(ativo="inicio"):
+    with st.sidebar:
+        # LOGO E TÍTULO
+        st.markdown("## 🧾 FichApp")
+        st.markdown("### Menu")
+        st.markdown("---")
 
-def sidebar_menu(ativo: str = ""):
-    """Desenha o menu lateral único do FichApp.
-    Parâmetro `ativo` é apenas informativo (se quiser realçar algo no futuro)."""
-    _css_sidebar()
+        # =========================
+        # LINKS DE NAVEGAÇÃO
+        # =========================
+        st.page_link(
+            "streamlit_app.py",
+            label="🏠 Início",
+            disabled=(ativo == "inicio")
+        )
 
-    st.sidebar.markdown("### FichApp")
-    st.sidebar.markdown("<div class='subtle'>Menu</div>", unsafe_allow_html=True)
+        st.page_link(
+            "pages/01_Cadastro_de_Insumos.py",
+            label="📦 Cadastro de Insumos",
+            disabled=(ativo == "insumos")
+        )
 
-    st.sidebar.page_link("streamlit_app.py", label="Início", icon="🏠")
-    st.sidebar.page_link("pages/01_Cadastro_de_Insumos.py", label="Cadastro de Insumos", icon="📦")
-    st.sidebar.page_link("pages/02_💰_Parametros_Financeiros.py", label="Parâmetros Financeiros", icon="💰")
+        st.page_link(
+            "pages/02_💰_Parametros_Financeiros.py",
+            label="💰 Parâmetros Financeiros",
+            disabled=(ativo == "parametros")
+        )
+
+        st.page_link(
+            "pages/03_📊_Engenharia_do_Cardapio.py",
+            label="📊 Engenharia do Cardápio",
+            disabled=(ativo == "engenharia")
+        )
+
+        st.markdown("---")
+        st.caption("Navegação fixa • FichApp v1.0.0")
