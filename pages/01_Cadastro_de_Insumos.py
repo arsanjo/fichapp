@@ -1,341 +1,161 @@
 import streamlit as st
 import pandas as pd
+import os
 from datetime import date, datetime
-from pathlib import Path
 
-# ============================================================
-# CONFIGURAÇÃO INICIAL
-# ============================================================
-st.set_page_config(page_title="FichApp — Cadastro de Insumos", page_icon="📦", layout="wide")
+# =========================================================
+# CONFIGURAÇÕES INICIAIS
+# =========================================================
+st.set_page_config(page_title="Cadastro de Insumos - FichApp", page_icon="📦", layout="centered")
 
-APP_DIR = Path(__file__).resolve().parents[1]
-DATA_DIR = APP_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+INSUMOS_CSV = os.path.join(DATA_DIR, "insumos.csv")
 
-COMPRAS_CSV = DATA_DIR / "compras_insumos.csv"
-GRUPOS_CSV  = DATA_DIR / "grupos_insumos.csv"
-UNIDS_CSV   = DATA_DIR / "unidades_medida.csv"
+# =========================================================
+# UNIDADES PADRÃO
+# =========================================================
+unidades_padrao = {
+    "KG": ("Quilograma", 1),
+    "G": ("Grama", 1000),
+    "L": ("Litro", 1),
+    "ML": ("Mililitro", 1000),
+    "UN": ("Unidade", 1),
+    "DZ": ("Dúzia", 12),
+    "CT": ("Cento", 100),
+    "MIL": ("Milheiro", 1000),
+}
 
-# Campos padrão do CSV
-COLS_COMPRAS = [
-    "data_compra","grupo","insumo_resumo","insumo_completo","marca","tipo",
-    "un_med","quantidade_compra","qtde_para_custos","valor_total_compra","valor_frete",
-    "percentual_perda","valor_unit_bruto","custo_total_com_frete","quantidade_liquida",
-    "custo_real_unitario","valor_unit_para_custos","fornecedor","fone_fornecedor",
-    "representante","documento","observacao","Atualizado_em"
-]
-
-# Grupos e unidades padrão
-DEFAULT_GRUPOS = [
-    "Embalagem","Peixe","Carne","Hortifruti","Bebida","Frios",
-    "Molhos e Temperos","Grãos e Cereais","Higiene","Limpeza","Outros"
-]
-
-DEFAULT_UNIDADES = [
-    ("KG","Quilograma", None),
-    ("G","Grama", None),
-    ("L","Litro", None),
-    ("ML","Mililitro", None),
-    ("UN","Unidade", None),
-    ("DZ","Dúzia", 12),
-    ("MIL","Milheiro", 1000),
-    ("CT","Cento", 100),
-    ("CX","Caixa", None),
-    ("FD","Fardo", None),
-    ("PAC","Pacote", None),
-    ("BAN","Bandeja", None),
-    ("PAR","Par", 2),
-    ("POR","Porção", None),
-]
-
-# Inicializa arquivos
-if not COMPRAS_CSV.exists():
-    pd.DataFrame(columns=COLS_COMPRAS).to_csv(COMPRAS_CSV, index=False)
-if not GRUPOS_CSV.exists():
-    pd.DataFrame({"grupo": DEFAULT_GRUPOS}).to_csv(GRUPOS_CSV, index=False)
-if not UNIDS_CSV.exists():
-    pd.DataFrame(DEFAULT_UNIDADES, columns=["codigo","descricao","qtde_padrao"]).to_csv(UNIDS_CSV, index=False)
-
-# ============================================================
+# =========================================================
 # FUNÇÕES AUXILIARES
-# ============================================================
-@st.cache_data
-def load_df(path: Path) -> pd.DataFrame:
-    try:
-        return pd.read_csv(path)
-    except Exception:
-        return pd.DataFrame()
+# =========================================================
+def carregar_insumos():
+    if os.path.exists(INSUMOS_CSV):
+        return pd.read_csv(INSUMOS_CSV)
+    else:
+        return pd.DataFrame(columns=[
+            "data_compra", "grupo", "insumo_resumo", "insumo_completo", "marca", "tipo",
+            "un_med", "quantidade_compra", "qtde_para_custos", "valor_total_compra", 
+            "valor_frete", "percentual_perda", "valor_unit_bruto", "custo_total_com_frete", 
+            "quantidade_liquida", "custo_real_unitario", "valor_unit_para_custos", 
+            "fornecedor", "fone_fornecedor", "representante", "documento", "observacao",
+            "atualizado_em"
+        ])
 
-def save_df(df: pd.DataFrame, path: Path):
-    df.to_csv(path, index=False)
-    st.cache_data.clear()
+def salvar_insumo(df):
+    df.to_csv(INSUMOS_CSV, index=False)
 
-def get_grupos():
-    g = load_df(GRUPOS_CSV)
-    if "grupo" in g.columns:
-        return sorted(g["grupo"].dropna().astype(str).unique().tolist())
-    return DEFAULT_GRUPOS
+# =========================================================
+# INTERFACE
+# =========================================================
+st.title("📦 Cadastro de Insumos")
+st.caption("Cadastre insumos com grupos, unidades dinâmicas, frete, perda e cálculos automáticos de custo.")
 
-def get_unidades():
-    u = load_df(UNIDS_CSV)
-    if {"codigo","descricao","qtde_padrao"}.issubset(u.columns):
-        return u
-    return pd.DataFrame(DEFAULT_UNIDADES, columns=["codigo","descricao","qtde_padrao"])
+acao = st.radio("Ação:", ["➕ Cadastrar novo insumo", "✏️ Editar insumo", "📋 Visualizar insumos"], index=0)
 
-def label_unidade(row):
-    return f"{row['codigo']} – {row['descricao']}"
+# =========================================================
+# CADASTRAR NOVO INSUMO
+# =========================================================
+if acao == "➕ Cadastrar novo insumo":
+    st.markdown("### 🧾 Dados do insumo")
 
-def calc_preview(qtd_compra, total, frete, perda, qtd_custo):
-    valor_unit_bruto = (total / qtd_compra) if qtd_compra > 0 else 0
-    custo_total_com_frete = total + frete
-    fator_apr = (100 - perda) / 100
-    qtd_liquida = qtd_compra * fator_apr if qtd_compra > 0 else 0
-    custo_real_unit = (custo_total_com_frete / qtd_liquida) if qtd_liquida > 0 else 0
-    valor_unit_para_custos = (custo_real_unit / qtd_custo) if qtd_custo > 0 else 0
-    return valor_unit_bruto, custo_total_com_frete, qtd_liquida, custo_real_unit, valor_unit_para_custos
+    with st.form("cadastro_insumo", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            data_compra = st.date_input("Data da compra", value=date.today(), format="DD/MM/YYYY")
+            grupo = st.text_input("Grupo")
+            nome_resumo = st.text_input("Nome resumido do insumo")
+            nome_completo = st.text_input("Nome completo do insumo", value=nome_resumo if nome_resumo else "")
+            marca = st.text_input("Marca (opcional)")
+            tipo = st.selectbox("Tipo", ["Comprado", "Produzido no restaurante"])
+        with col2:
+            un_med = st.selectbox("Unidade de medida", list(unidades_padrao.keys()), index=0)
+            quantidade_compra = st.number_input("Quantidade comprada", min_value=0.0, value=0.0, step=0.01)
 
-# ============================================================
-# GERENCIAR GRUPOS / UNIDADES
-# ============================================================
-with st.expander("🧩 Gerenciar listas auxiliares"):
-    gcol, ucol = st.columns(2)
-    with gcol:
-        st.subheader("➕ Grupos de insumo")
-        novo_grupo = st.text_input("Novo grupo")
-        if st.button("Adicionar grupo"):
-            if novo_grupo.strip():
-                g = load_df(GRUPOS_CSV)
-                if "grupo" not in g.columns:
-                    g = pd.DataFrame({"grupo":[]})
-                if novo_grupo not in g["grupo"].values:
-                    g.loc[len(g)] = [novo_grupo]
-                    save_df(g, GRUPOS_CSV)
-                    st.success(f"Grupo “{novo_grupo}” adicionado com sucesso.")
-                    st.rerun()
-            else:
-                st.warning("Digite o nome do grupo antes de adicionar.")
+            # cálculo automático da quantidade para custos
+            multiplicador = unidades_padrao.get(un_med, ("", 1))[1]
+            qtde_para_custos_auto = quantidade_compra / multiplicador if multiplicador > 1 else quantidade_compra
+            qtde_para_custos = st.number_input("Quantidade para custos", min_value=0.0, value=float(qtde_para_custos_auto), step=0.01)
 
-    with ucol:
-        st.subheader("➕ Unidades de medida")
-        abrev = st.text_input("Abreviação (ex.: KG, UN, CT)")
-        desc = st.text_input("Descrição (ex.: Quilograma)")
-        qtd_padrao = st.number_input("Qtde padrão (opcional)", min_value=0.0, step=1.0, value=0.0)
-        if st.button("Adicionar unidade"):
-            if abrev.strip() and desc.strip():
-                u = load_df(UNIDS_CSV)
-                if "codigo" not in u.columns:
-                    u = pd.DataFrame(columns=["codigo","descricao","qtde_padrao"])
-                if abrev.upper() not in u["codigo"].values:
-                    qtd_val = qtd_padrao if qtd_padrao > 0 else None
-                    u.loc[len(u)] = [abrev.upper(), desc.strip(), qtd_val]
-                    save_df(u, UNIDS_CSV)
-                    st.success(f"Unidade “{abrev.upper()} – {desc}” adicionada.")
-                    st.rerun()
-            else:
-                st.warning("Informe abreviação e descrição.")
+            valor_total_compra = st.number_input("Valor total da compra (R$)", min_value=0.0, value=0.0, step=0.01)
+            valor_frete = st.number_input("Frete (R$)", min_value=0.0, value=0.0, step=0.01)
+            percentual_perda = st.number_input("% de perda", min_value=0.0, max_value=100.0, value=0.0, step=0.1)
 
-# ============================================================
-# INTERFACE PRINCIPAL
-# ============================================================
-st.markdown("## 📦 Cadastro de Insumos")
-st.write("Cadastre insumos com **grupos**, **unidades dinâmicas**, **frete**, **perda** e cálculos automáticos de custo.")
+        st.markdown("### 💰 Pré-visualização dos cálculos")
 
-modo = st.radio("Ação:", ["➕ Cadastrar novo insumo", "✏️ Editar insumo", "📋 Visualizar insumos"])
+        # cálculos automáticos
+        valor_unit_bruto = valor_total_compra / quantidade_compra if quantidade_compra > 0 else 0
+        custo_total_com_frete = valor_total_compra + valor_frete
+        quantidade_liquida = quantidade_compra * (1 - percentual_perda / 100)
+        custo_real_unitario = custo_total_com_frete / quantidade_liquida if quantidade_liquida > 0 else 0
+        valor_unit_para_custos = custo_real_unitario / qtde_para_custos if qtde_para_custos > 0 else 0
 
-grupos = get_grupos()
-unidades_df = get_unidades()
-unidades_labels = unidades_df.apply(label_unidade, axis=1).tolist()
-map_label_to_code = dict(zip(unidades_labels, unidades_df["codigo"]))
-map_code_to_qpad = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"]))
-df_compras = load_df(COMPRAS_CSV)
-
-# ============================================================
-# FORMULÁRIO BASE
-# ============================================================
-def form_insumo(initial: dict | None, is_edit: bool):
-    dat = initial.copy() if initial else {}
-    dat.setdefault("data_compra", date.today().strftime("%d/%m/%Y"))
-    dat.setdefault("grupo", grupos[0] if grupos else "Outros")
-    dat.setdefault("insumo_resumo", "")
-    dat.setdefault("insumo_completo", "")
-    dat.setdefault("marca", "")
-    dat.setdefault("tipo", "Comprado")
-    dat.setdefault("un_med", "UN")
-    dat.setdefault("quantidade_compra", 0.0)
-    dat.setdefault("qtde_para_custos", 1.0)
-    dat.setdefault("valor_total_compra", 0.0)
-    dat.setdefault("valor_frete", 0.0)
-    dat.setdefault("percentual_perda", 0.0)
-    dat.setdefault("fornecedor", "")
-    dat.setdefault("fone_fornecedor", "")
-    dat.setdefault("representante", "")
-    dat.setdefault("documento", "")
-    dat.setdefault("observacao", "")
-
-    with st.form("form_edit" if is_edit else "form_new", clear_on_submit=False):
         c1, c2 = st.columns(2)
         with c1:
-            data_compra = st.date_input(
-                "Data da compra",
-                value=datetime.strptime(dat["data_compra"], "%d/%m/%Y").date() if dat["data_compra"] else date.today(),
-                format="DD/MM/YYYY"
-            )
-            grupo = st.selectbox("Grupo", options=grupos, index=grupos.index(dat["grupo"]) if dat["grupo"] in grupos else 0)
-            insumo_resumo = st.text_input("Nome resumido do insumo", value=dat["insumo_resumo"])
-            insumo_completo = st.text_input(
-                "Nome completo do insumo",
-                value=dat["insumo_completo"] or dat["insumo_resumo"]
-            )
-            if insumo_resumo and (dat["insumo_completo"] == "" or dat["insumo_completo"] == dat["insumo_resumo"]):
-                insumo_completo = insumo_resumo
-            marca = st.text_input("Marca", value=dat["marca"])
-            tipo = st.selectbox("Tipo", ["Comprado", "Produzido no restaurante"], index=0 if dat["tipo"] != "Produzido no restaurante" else 1)
-
+            st.write(f"**Valor unitário bruto:** R$ {valor_unit_bruto:.4f}")
+            st.write(f"**Custo total com frete:** R$ {custo_total_com_frete:.2f}")
+            st.write(f"**Quantidade líquida (após perda):** {quantidade_liquida:.4f} {un_med}")
         with c2:
-            # ============ BLOCO DE UNIDADE E QTDE AUTOMÁTICA ============
-            un_label_sel = st.selectbox(
-                "Unidade de medida",
-                options=unidades_labels,
-                index=unidades_df.index[unidades_df["codigo"] == dat["un_med"]].tolist()[0]
-                if dat["un_med"] in unidades_df["codigo"].tolist() else 0,
-                key="un_med_select"
-            )
-            un_med = map_label_to_code[un_label_sel]
+            st.write(f"**Custo real unitário:** R$ {custo_real_unitario:.4f}")
+            st.write(f"**Custo unitário p/ custos:** R$ {valor_unit_para_custos:.6f}")
 
-            if "last_un_med" not in st.session_state:
-                st.session_state.last_un_med = un_med
+        st.markdown("### 🧾 Fornecedor e contato (opcional)")
+        col3, col4 = st.columns(2)
+        with col3:
+            fornecedor = st.text_input("Fornecedor")
+            fone_fornecedor = st.text_input("Telefone do fornecedor")
+            documento = st.text_input("Documento / Nota Fiscal")
+        with col4:
+            representante = st.text_input("Representante")
+            observacao = st.text_area("Observação")
 
-            auto_valor = map_code_to_qpad.get(un_med, 1.0)
-            if pd.isna(auto_valor):
-                auto_valor = 1.0
+        enviado = st.form_submit_button("💾 Salvar insumo")
 
-            if un_med != st.session_state.last_un_med:
-                st.session_state.qtde_para_custos = auto_valor
-                st.session_state.last_un_med = un_med
-            else:
-                if "qtde_para_custos" not in st.session_state:
-                    st.session_state.qtde_para_custos = dat.get("qtde_para_custos", auto_valor)
-
-            quantidade_compra = st.number_input(
-                "Quantidade comprada",
-                value=float(dat["quantidade_compra"]),
-                min_value=0.0,
-                step=0.01
-            )
-
-            qtde_para_custos = st.number_input(
-                "Quantidade para custos",
-                value=float(st.session_state.qtde_para_custos),
-                min_value=0.0,
-                step=1.0,
-                key="qtde_para_custos_input",
-                help="Preenchida automaticamente conforme unidade padrão (MIL=1000, CT=100, DZ=12)."
-            )
-            # ===========================================================
-
-        st.markdown("---")
-        st.subheader("💰 Custos e ajustes")
-
-        c3, c4, c5 = st.columns(3)
-        with c3:
-            valor_total_compra = st.number_input("Valor total da compra (R$)", value=float(dat["valor_total_compra"]), min_value=0.0, step=0.01)
-        with c4:
-            valor_frete = st.number_input("Frete (R$)", value=float(dat["valor_frete"]), min_value=0.0, step=0.01)
-        with c5:
-            percentual_perda = st.number_input("% de perda", value=float(dat["percentual_perda"]), min_value=0.0, max_value=100.0, step=0.5)
-
-        valor_unit_bruto, custo_total_com_frete, qtd_liq, custo_real_unit, valor_unit_custos = calc_preview(
-            quantidade_compra, valor_total_compra, valor_frete, percentual_perda, qtde_para_custos
-        )
-
-        st.markdown("#### 📊 Pré-visualização")
-        st.write(f"• Valor unitário bruto: **R$ {valor_unit_bruto:.4f}**")
-        st.write(f"• Custo total com frete: **R$ {custo_total_com_frete:.2f}**")
-        st.write(f"• Quantidade líquida (após perda): **{qtd_liq:.4f} {un_med}**")
-        st.write(f"• Custo real unitário: **R$ {custo_real_unit:.6f}**")
-        st.write(f"• Custo unitário p/ custos: **R$ {valor_unit_custos:.6f}**")
-
-        st.markdown("---")
-        st.subheader("📇 Fornecedor e contato")
-        fornecedor = st.text_input("Fornecedor", value=dat["fornecedor"])
-        representante = st.text_input("Representante", value=dat["representante"])
-        fone_fornecedor = st.text_input("Fone do fornecedor", value=dat["fone_fornecedor"])
-        documento = st.text_input("Documento / Nota Fiscal", value=dat["documento"])
-        observacao = st.text_area("Observação", value=dat["observacao"])
-
-        enviado = st.form_submit_button("💾 Salvar alterações" if is_edit else "💾 Salvar insumo")
-
-    payload = {
-        "data_compra": data_compra.strftime("%d/%m/%Y"),
-        "grupo": grupo,
-        "insumo_resumo": insumo_resumo,
-        "insumo_completo": insumo_completo,
-        "marca": marca,
-        "tipo": tipo,
-        "un_med": un_med,
-        "quantidade_compra": quantidade_compra,
-        "qtde_para_custos": qtde_para_custos,
-        "valor_total_compra": valor_total_compra,
-        "valor_frete": valor_frete,
-        "percentual_perda": percentual_perda,
-        "valor_unit_bruto": round(valor_unit_bruto,4),
-        "custo_total_com_frete": round(custo_total_com_frete,4),
-        "quantidade_liquida": round(qtd_liq,4),
-        "custo_real_unitario": round(custo_real_unit,6),
-        "valor_unit_para_custos": round(valor_unit_custos,6),
-        "fornecedor": fornecedor,
-        "fone_fornecedor": fone_fornecedor,
-        "representante": representante,
-        "documento": documento,
-        "observacao": observacao,
-        "Atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-
-    return enviado, payload
-
-# ============================================================
-# ➊ CADASTRAR
-# ============================================================
-if modo == "➕ Cadastrar novo insumo":
-    enviado, novo = form_insumo(None, False)
-    if enviado:
-        df = load_df(COMPRAS_CSV)
-        df = pd.concat([df, pd.DataFrame([novo])], ignore_index=True)
-        save_df(df, COMPRAS_CSV)
-        st.success(f"Insumo **{novo['insumo_resumo']}** salvo com sucesso!")
-        st.rerun()
-
-# ============================================================
-# ➋ EDITAR
-# ============================================================
-elif modo == "✏️ Editar insumo":
-    df = load_df(COMPRAS_CSV)
-    if df.empty:
-        st.info("Nenhum insumo cadastrado ainda.")
-    else:
-        idx = st.selectbox(
-            "Selecione o insumo para editar:",
-            options=df.index.tolist(),
-            format_func=lambda i: f"{df.loc[i,'insumo_resumo']} • {df.loc[i,'grupo']} ({df.loc[i,'data_compra']})"
-        )
-        dados = df.loc[idx].to_dict()
-        enviado, atualizado = form_insumo(dados, True)
         if enviado:
-            df.loc[idx] = atualizado
-            save_df(df, COMPRAS_CSV)
-            st.success("Alterações salvas com sucesso.")
-            st.rerun()
+            df = carregar_insumos()
+            novo = {
+                "data_compra": data_compra.strftime("%d/%m/%Y"),
+                "grupo": grupo,
+                "insumo_resumo": nome_resumo,
+                "insumo_completo": nome_completo,
+                "marca": marca,
+                "tipo": tipo,
+                "un_med": un_med,
+                "quantidade_compra": quantidade_compra,
+                "qtde_para_custos": qtde_para_custos,
+                "valor_total_compra": valor_total_compra,
+                "valor_frete": valor_frete,
+                "percentual_perda": percentual_perda,
+                "valor_unit_bruto": valor_unit_bruto,
+                "custo_total_com_frete": custo_total_com_frete,
+                "quantidade_liquida": quantidade_liquida,
+                "custo_real_unitario": custo_real_unitario,
+                "valor_unit_para_custos": valor_unit_para_custos,
+                "fornecedor": fornecedor,
+                "fone_fornecedor": fone_fornecedor,
+                "representante": representante,
+                "documento": documento,
+                "observacao": observacao,
+                "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            df = pd.concat([df, pd.DataFrame([novo])], ignore_index=True)
+            salvar_insumo(df)
+            st.success(f"Insumo **{nome_resumo}** salvo com sucesso!")
+            st.experimental_rerun()
 
-# ============================================================
-# ➌ VISUALIZAR
-# ============================================================
-else:
-    df = load_df(COMPRAS_CSV)
+# =========================================================
+# VISUALIZAR INSUMOS
+# =========================================================
+elif acao == "📋 Visualizar insumos":
+    st.markdown("### 📋 Lista de Insumos Cadastrados")
+    df = carregar_insumos()
     if df.empty:
         st.info("Nenhum insumo cadastrado ainda.")
     else:
-        df_show = df.copy()
-        for c in ["valor_total_compra","valor_frete","valor_unit_bruto","custo_total_com_frete","custo_real_unitario","valor_unit_para_custos"]:
-            if c in df_show.columns:
-                df_show[c] = df_show[c].apply(lambda x: f"R$ {x:,.4f}".replace(",", "X").replace(".", ",").replace("X","."))
-        st.dataframe(df_show, use_container_width=True)
+        st.dataframe(df, use_container_width=True)
+
+# =========================================================
+# EDITAR INSUMO (placeholder futuro)
+# =========================================================
+elif acao == "✏️ Editar insumo":
+    st.info("✏️ Função de edição de insumos será implementada em breve.")
