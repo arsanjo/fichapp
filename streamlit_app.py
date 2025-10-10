@@ -16,17 +16,22 @@ st.set_page_config(
 )
 
 # ==============================
-# ESCONDER MENU PADRÃO
+# ESCONDER MENUS PADRÕES DO STREAMLIT
 # ==============================
-hide_default_menu = """
+hide_default_elements = """
     <style>
+        /* Oculta o menu automático "streamlit app" e suas páginas */
         section[data-testid="stSidebarNav"] {display: none !important;}
+        /* Oculta também o texto "Navegação fixa • FichApp" no final */
+        div[data-testid="stSidebarFooter"] {display: none !important;}
+        footer {visibility: hidden;}
+        /* Garante o tamanho do menu lateral customizado */
         [data-testid="stSidebar"] {
             min-width: 270px;
         }
     </style>
 """
-st.markdown(hide_default_menu, unsafe_allow_html=True)
+st.markdown(hide_default_elements, unsafe_allow_html=True)
 
 # ==============================
 # MENU FIXO DO FICHAPP
@@ -56,10 +61,16 @@ with col2:
     # Versículo bíblico
     st.markdown(
         """
-        <div style='margin-top:40px; text-align:center; font-style:italic; color:#333; font-size:17px;'>
+        <div style='margin-top:40px; text-align:center; font-style:italic; color:#333; font-size:17px; animation: fadeIn 2s ease-in-out;'>
             “E tudo quanto fizerdes, fazei-o de todo o coração, como ao Senhor, e não aos homens.”<br>
             <b>Colossenses 3:23</b>
         </div>
+        <style>
+            @keyframes fadeIn {
+                from {opacity: 0;}
+                to {opacity: 1;}
+            }
+        </style>
         """,
         unsafe_allow_html=True
     )
