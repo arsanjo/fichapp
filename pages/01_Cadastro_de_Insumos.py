@@ -3,6 +3,9 @@ import pandas as pd
 from datetime import datetime, date
 import os, json, random
 from utils.nav import sidebar_menu
+
+# ativa o menu lateral fixo padronizado
+sidebar_menu(ativo="insumos")
 # =========================================================
 # CONFIG / THEME
 # =========================================================
