@@ -16,30 +16,51 @@ st.set_page_config(
 )
 
 # ==============================
-# ESCONDER MENUS PADRÕES DO STREAMLIT
+# REMOVER MENUS PADRÕES COMPLETAMENTE
 # ==============================
-hide_default_elements = """
+hide_all_default_menus = """
     <style>
-        /* Oculta o menu automático "streamlit app" e suas páginas */
-        section[data-testid="stSidebarNav"] {display: none !important;}
-        /* Oculta também o texto "Navegação fixa • FichApp" no final */
-        div[data-testid="stSidebarFooter"] {display: none !important;}
-        footer {visibility: hidden;}
-        /* Garante o tamanho do menu lateral customizado */
+        /* Remove o menu padrão do Streamlit (streamlit app e páginas) */
+        section[data-testid="stSidebarNav"] {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            overflow: hidden !important;
+        }
+
+        /* Remove o rodapé padrão de navegação fixa */
+        div[data-testid="stSidebarFooter"] {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+        }
+
+        /* Remove linhas separadoras e espaçamentos extras */
+        [data-testid="stSidebar"] hr {
+            display: none !important;
+        }
+
+        /* Remove o título automático (streamlit app) */
+        [data-testid="stSidebarNav"] > div:first-child {
+            display: none !important;
+        }
+
+        /* Ajusta tamanho e layout do nosso menu personalizado */
         [data-testid="stSidebar"] {
             min-width: 270px;
+            background-color: #f5f6fa;
         }
     </style>
 """
-st.markdown(hide_default_elements, unsafe_allow_html=True)
+st.markdown(hide_all_default_menus, unsafe_allow_html=True)
 
 # ==============================
-# MENU FIXO DO FICHAPP
+# MENU FIXO PERSONALIZADO
 # ==============================
 menu_lateral()
 
 # ==============================
-# CONTEÚDO PRINCIPAL
+# CONTEÚDO PRINCIPAL (TELA INICIAL)
 # ==============================
 col1, col2, col3 = st.columns([1, 2, 1])
 
