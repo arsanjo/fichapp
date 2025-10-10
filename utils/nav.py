@@ -1,51 +1,26 @@
+# utils/nav.py
 import streamlit as st
 
-# ==============================
-# Menu lateral unificado (fixo)
-# ==============================
-def menu_lateral():
-    """
-    Desenha o menu lateral do FichApp, igual em todas as páginas, e
-    esconde o menu padrão do multipage do Streamlit.
-    """
+def _css_sidebar():
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"]{min-width:270px; background:#f5f6fa;}
+        [data-testid="stSidebar"] h3{margin-top:.5rem; margin-bottom:.2rem;}
+        [data-testid="stSidebar"] .subtle{color:#6b7280; font-size:12px; margin:6px 0 10px;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    # 1) Esconde completamente o nav padrão do Streamlit (seções "streamlit app" etc.)
-    HIDE_DEFAULT_NAV = """
-    <style>
-      /* Esconde o container do menu padrão */
-      section[data-testid="stSidebarNav"] { display: none !important; }
-      /* Garante a sidebar aberta por padrão */
-      [data-testid="stSidebar"] { min-width: 270px; }
-    </style>
-    """
-    st.markdown(HIDE_DEFAULT_NAV, unsafe_allow_html=True)
+def sidebar_menu(ativo: str = ""):
+    """Desenha o menu lateral único do FichApp.
+    Parâmetro `ativo` é apenas informativo (se quiser realçar algo no futuro)."""
+    _css_sidebar()
 
-    # 2) Força a sidebar expandida para o usuário
-    st.set_page_config(initial_sidebar_state="expanded")
+    st.sidebar.markdown("### FichApp")
+    st.sidebar.markdown("<div class='subtle'>Menu</div>", unsafe_allow_html=True)
 
-    # 3) Render do menu próprio
-    with st.sidebar:
-        # Logo (usa sua imagem enviada em assets)
-        try:
-            st.logo("assets/logo_fichapp.png")
-        except Exception:
-            st.markdown("### FichApp")
-
-        st.markdown("#### Menu")
-
-        # Links estáticos para as páginas
-        # (st.page_link precisa do caminho relativo ao repo)
-        st.page_link("streamlit_app.py", label="Início", icon=":material/home:")
-        st.page_link(
-            "pages/01_Cadastro_de_Insumos.py",
-            label="Cadastro de Insumos",
-            icon="📦",
-        )
-        st.page_link(
-            "pages/02_💰_Parametros_Financeiros.py",
-            label="Parâmetros Financeiros",
-            icon="💰",
-        )
-
-        st.markdown("---")
-        st.caption("Navegação fixa • FichApp")
+    st.sidebar.page_link("streamlit_app.py", label="Início", icon="🏠")
+    st.sidebar.page_link("pages/01_Cadastro_de_Insumos.py", label="Cadastro de Insumos", icon="📦")
+    st.sidebar.page_link("pages/02_💰_Parametros_Financeiros.py", label="Parâmetros Financeiros", icon="💰")
