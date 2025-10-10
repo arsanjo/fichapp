@@ -1,73 +1,58 @@
+# =========================================================
+# FichApp - Sistema de controle de fichas técnicas e insumos
+# =========================================================
 import streamlit as st
-from PIL import Image
-import json, os
-from datetime import date
 from utils.nav import sidebar_menu
+import datetime
 
-# ==============================
-# CONFIG GLOBAL
-# ==============================
+# =========================================================
+# CONFIGURAÇÕES INICIAIS DA APLICAÇÃO
+# =========================================================
 st.set_page_config(
     page_title="FichApp",
     page_icon="📘",
     layout="wide",
     initial_sidebar_state="expanded",
+    menu_items=None  # 🚫 remove o menu automático do Streamlit
 )
 
-# nosso menu único
-sidebar_menu(ativo="inicio")
+# =========================================================
+# MENU LATERAL (IMPORTADO DE utils/nav.py)
+# =========================================================
+sidebar_menu(ativo="home")
 
-# ==============================
-# CONTEÚDO DA HOME
-# ==============================
-col1, col2, col3 = st.columns([1, 2, 1])
+# =========================================================
+# CONTEÚDO PRINCIPAL DA PÁGINA INICIAL
+# =========================================================
+st.markdown("<h1 style='text-align: center;'>FichApp</h1>", unsafe_allow_html=True)
+st.markdown(
+    "<h4 style='text-align: center; color: gray;'>Sistema de controle de fichas técnicas e insumos</h4>",
+    unsafe_allow_html=True
+)
 
-logo_path = os.path.join("assets", "logo_fichapp.png")
-with col2:
-    if os.path.exists(logo_path):
-        st.image(Image.open(logo_path), use_container_width=True)
+st.write("")
+st.markdown("---")
 
-    st.markdown(
-        """
-        <h1 style='text-align:center;margin-top:-8px;'>FichApp</h1>
-        <p style='text-align:center;color:#6b7280;font-size:18px;margin-top:-8px'>
-          Sistema de controle de fichas técnicas e insumos
-        </p>
-        """,
-        unsafe_allow_html=True,
-    )
+st.markdown(
+    """
+    <p style="text-align: center; font-style: italic; color: #555;">
+    “E tudo quanto fizerdes, fazei-o de todo o coração, como ao Senhor, e não aos homens.”<br>
+    <b>Colossenses 3:23</b>
+    </p>
+    """,
+    unsafe_allow_html=True
+)
 
-    st.markdown(
-        """
-        <div style='margin-top:36px;text-align:center;font-style:italic;color:#374151;font-size:17px;'>
-          “E tudo quanto fizerdes, fazei-o de todo o coração, como ao Senhor, e não aos homens.”<br>
-          <b>Colossenses 3:23</b>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# ==============================
-# RODAPÉ COM VERSÃO
-# ==============================
-def rodape():
-    versao, data = "1.0.0", str(date.today())
-    try:
-        with open("version.json","r",encoding="utf-8") as f:
-            info = json.load(f)
-        versao = info.get("version", versao)
-        data   = info.get("last_update", data)
-    except Exception:
-        pass
-
-    st.markdown(
-        f"""
-        <div style='margin-top:60px;padding:12px;background:#0b1220;color:#fff;text-align:center;border-radius:10px;'>
-            <b>FichApp v{versao}</b> — atualizado em {data}<br>
-            Desenvolvido por <b>Arsanjo</b>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-rodape()
+# =========================================================
+# RODAPÉ - INFORMAÇÕES DE VERSÃO
+# =========================================================
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.markdown(
+    f"""
+    <div style="background-color: #0b132b; color: white; border-radius: 10px; padding: 1.5rem; text-align: center;">
+        <b>FichApp v1.0.0</b> — atualizado em {datetime.date.today().strftime("%Y-%m-%d")}<br>
+        Desenvolvido por <b>Arsanjo</b>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
