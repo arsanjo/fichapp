@@ -1,4 +1,4 @@
-# utils/nav.py - CORRIGIDO PARA EXIBIR A LOGO FICHAPP
+# utils/nav.py - CÓDIGO CORRIGIDO PARA IMAGEM (Removendo o argumento problemático)
 
 import streamlit as st
 
@@ -21,8 +21,9 @@ def sidebar_menu(ativo="home"):
         st.session_state.current_page = ativo
     
     # === ADICIONA A LOGOMARCA FichApp NO TOPO DO MENU LATERAL ===
-    # CORREÇÃO: Usando o nome do arquivo que está na pasta assets/
-    st.sidebar.image("assets/logo_fichapp.png", use_column_width="always")
+    # CORREÇÃO CRÍTICA: Usando 'width' em vez de 'use_column_width'
+    st.sidebar.image("assets/logo_fichapp.png", width=250) 
+    # Usar width=250 é um valor fixo e seguro para a barra lateral.
     # =============================================================
 
     st.sidebar.markdown("---")
