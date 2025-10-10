@@ -2,13 +2,13 @@
 
 import streamlit as st
 
-# Mapeamento do Rótulo do Menu -> Chave de Estado (Identificador único)
+# Mapeamento do Rótulo do Menu -> Nome do Arquivo (na raiz do projeto)
 MENU_PAGES = {
-    "Cadastro de Insumos": "insumos",
-    "Parâmetros Financeiros": "parametros",
-    "Engenharia do Cardápio": "engenharia",
-    "Ficha Técnica - Cozinha": "ficha_cozinha",
-    "Ficha Técnica - Admin": "ficha_admin",
+    "Cadastro de Insumos": "01_Cadastro_de_Insumos.py",
+    "Parâmetros Financeiros": "02_Parametros_Financeiros.py",
+    "Engenharia do Cardápio": "03_Engenharia_do_Cardapio.py",
+    "Ficha Técnica - Cozinha": "04_Ficha_Tecnica_Cozinha.py",
+    "Ficha Técnica - Admin": "05_Ficha_Tecnica_Admin.py"
 }
 
 def sidebar_menu(ativo="home"):
@@ -30,9 +30,9 @@ def sidebar_menu(ativo="home"):
     st.sidebar.markdown("---") 
 
     # 3. Botões das Páginas Secundárias
-    for label, page_key in MENU_PAGES.items():
-        # Usa um ícone genérico para não precisar de um ícone para cada página
-        icon = "⚫"
+    for label, filename in MENU_PAGES.items():
+        # A chave usada para st.session_state será o próprio nome do arquivo
+        page_key = filename
         
         # Cria o botão e verifica o clique
         if st.sidebar.button(label, key=f"nav_{page_key}"):
