@@ -1,5 +1,29 @@
 {
-  "version": "0.1.0",
-  "release_date": "2025-10-09",
-  "notes": "Estrutura inicial do FichApp, tema escuro e página principal."
+  "app_name": "FichApp",
+  "version": "1.0.0",
+  "release_name": "Base Estável",
+  "description": "Versão base do sistema FichApp com módulos de Cadastro de Insumos e Parâmetros Financeiros totalmente funcionais.",
+  "modules": {
+    "01_Cadastro_de_Insumos": {
+      "status": "estável",
+      "description": "Cadastro completo de insumos com cálculo automático de custo, frete e perda, além de gerenciamento de grupos e fornecedores."
+    },
+    "02_Parametros_Financeiros": {
+      "status": "estável",
+      "description": "Cadastro manual dos percentuais financeiros e tributários utilizados nos cálculos de precificação futura."
+    }
+  },
+  "infrastructure": {
+    "assets": "Logotipo oficial armazenado em assets/logo_fichapp.png",
+    "data": "Arquivos CSV gerados automaticamente para armazenamento local",
+    "pages": "Arquitetura modular numerada para navegação organizada",
+    "utils": "Espaço reservado para futuras funções auxiliares"
+  },
+  "credits": {
+    "developed_by": "Arsanjo",
+    "assistant": "GPT-5",
+    "note": "FichApp é um sistema de gestão e precificação desenvolvido para otimizar o controle de insumos e custos de produção com clareza e fé em Deus."
+  },
+  "created_at": "2025-10-10",
+  "last_update": "2025-10-10"
 }
