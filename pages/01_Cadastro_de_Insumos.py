@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 import os, json, random
-
+from utils.nav import menu_lateral
+menu_lateral()
 # =========================================================
 # CONFIG / THEME
 # =========================================================
