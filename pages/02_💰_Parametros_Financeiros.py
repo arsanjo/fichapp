@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
+from utils.nav import menu_lateral
+menu_lateral()
 
 # =========================================================
 # CONFIGURAÇÃO E ESTILO
