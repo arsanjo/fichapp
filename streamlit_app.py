@@ -3,7 +3,8 @@ from PIL import Image
 import json
 import os
 from datetime import date
-
+from utils.nav import menu_lateral
+menu_lateral()
 # ==============================
 # CONFIGURAÇÃO GERAL DA PÁGINA
 # ==============================
