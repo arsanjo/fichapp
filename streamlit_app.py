@@ -1,4 +1,4 @@
-# streamlit_app.py - CÓDIGO FINAL COM CONTEÚDO DA HOME ISOLADO
+# streamlit_app.py - CÓDIGO FINAL COM CORREÇÃO DE DEPRECIAÇÃO
 
 # =========================================================
 # FichApp - Sistema de controle de fichas técnicas e insumos
@@ -17,11 +17,11 @@ def load_page_content(page_key):
     if page_key == "home":
         # === CONTEÚDO MELHORADO DA HOME (DASHBOARD) ===
         
-        # O título já está na Home (no código original)
         # Centraliza a logomarca no cabeçalho
         col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
         with col_img2:
-            st.image("assets/logo_fichapp.png", use_column_width=True)
+            # CORREÇÃO CRÍTICA: Usando use_container_width=True para resolver o aviso de depreciação!
+            st.image("assets/logo_fichapp.png", use_container_width=True)
 
         st.markdown("<h1 style='text-align: center;'>FichApp Dashboard</h1>", unsafe_allow_html=True)
         st.markdown(
@@ -36,6 +36,8 @@ def load_page_content(page_key):
         col1, col2, col3 = st.columns(3)
         
         with col1:
+            # st.metric (o aviso de depreciação pode estar sendo causado por um dataframe ou widget antigo,
+            # mas vamos manter o código limpo aqui, ele deve desaparecer com a correção da imagem.)
             st.metric(label="Total de Fichas Criadas", value="24", delta="🚀 +2 Fichas")
         with col2:
             st.metric(label="Custo Médio dos Insumos", value="R$ 12,50", delta="🔻 -0.15 R$")
