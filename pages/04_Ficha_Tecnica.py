@@ -87,7 +87,6 @@ with col2:
     st.write(f"**Data:** {date.today().strftime('%d/%m/%Y')}")
 
 st.markdown(
-    "<p style='font-size: 0.8rem; color: red;'>Essa ficha técnica é de uso exclusivo da Pureto. "
-    "É vedada sua reprodução ou compartilhamento por qualquer meio que seja.</p>",
+    "<p style='font-size: 0.8rem; color: red;'>Siga sempre a Ficha Técnica para a padronização dos preparos.</p>",
     unsafe_allow_html=True
 )
