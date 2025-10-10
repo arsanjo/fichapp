@@ -1,41 +1,94 @@
 import streamlit as st
 
-# ======================================================
-# MENU LATERAL PRINCIPAL — FichApp
-# ======================================================
+# =========================================================
+# MENU LATERAL — versão otimizada com cache
+# =========================================================
+@st.cache_resource
+def sidebar_menu(ativo: str = None):
+    """
+    Renderiza o menu lateral fixo do FichApp com cache.
+    O parâmetro 'ativo' serve para destacar a página atual.
+    """
 
-def sidebar_menu(ativo="inicio"):
-    st.sidebar.markdown("<h3 style='margin-bottom: 0;'>📘 FichApp</h3>", unsafe_allow_html=True)
-    st.sidebar.markdown("<small>Menu principal</small>", unsafe_allow_html=True)
-    st.sidebar.markdown("---")
+    # Define estilo personalizado do menu
+    st.markdown("""
+        <style>
+            /* Remove barra superior automática do Streamlit */
+            header {visibility: hidden;}
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
 
-    # Lista de itens do menu (sem emojis nos links)
-    menu_itens = {
-        "inicio": {"icon": "🏠", "label": "Início", "link": "/Inicio"},
-        "insumos": {"icon": "📦", "label": "Cadastro de Insumos", "link": "/Cadastro_de_Insumos"},
-        "parametros": {"icon": "💰", "label": "Parâmetros Financeiros", "link": "/Parametros_Financeiros"},
-        "engenharia": {"icon": "📊", "label": "Engenharia do Cardápio", "link": "/Engenharia_do_Cardapio"},
-        "ficha_tecnica": {"icon": "🧾", "label": "Ficha Técnica", "link": "/Ficha_Tecnica"},
-    }
+            /* Estilo do menu lateral */
+            section[data-testid="stSidebar"] {
+                background-color: #f7f8fa;
+                border-right: 1px solid #e0e0e0;
+            }
 
-    # Renderização do menu
-    for chave, item in menu_itens.items():
-        estilo = (
-            "background-color:#0f172a; color:white; border-radius:8px; padding:6px 12px;"
-            if chave == ativo
-            else "padding:6px 12px; color:#333;"
-        )
-        st.sidebar.markdown(
-            f"""
-            <a href="{item['link']}" target="_self" style="text-decoration:none;">
-                <div style="{estilo}">{item['icon']} {item['label']}</div>
-            </a>
-            """,
-            unsafe_allow_html=True,
-        )
+            .menu-item {
+                padding: 0.5rem 0.75rem;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                font-size: 0.95rem;
+                font-weight: 500;
+                margin-bottom: 0.3rem;
+                color: #333;
+                text-decoration: none;
+            }
+            .menu-item:hover {
+                background-color: #e8f0fe;
+                color: #0b57d0;
+            }
+            .menu-item.active {
+                background-color: #0b57d0;
+                color: white !important;
+                font-weight: 600;
+            }
 
-    st.sidebar.markdown("---")
-    st.sidebar.markdown(
-        "<p style='text-align:center; font-size:0.8rem; opacity:.7;'>FichApp v1.0.0</p>",
-        unsafe_allow_html=True,
-    )
+            .menu-icon {
+                margin-right: 8px;
+                font-size: 1.1rem;
+            }
+
+            .menu-footer {
+                margin-top: 1rem;
+                font-size: 0.75rem;
+                color: #999;
+                text-align: center;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # =========================================================
+    # CONTEÚDO DO MENU
+    # =========================================================
+    with st.sidebar:
+        st.markdown("### 📘 FichApp")
+        st.markdown("Menu principal")
+        st.write("")
+
+        # Itens do menu
+        menu_itens = {
+            "home": {"nome": "Início", "icone": "🏠", "link": "Home"},
+            "insumos": {"nome": "Cadastro de Insumos", "icone": "📦", "link": "Cadastro_de_Insumos"},
+            "financeiros": {"nome": "Parâmetros Financeiros", "icone": "💰", "link": "Parametros_Financeiros"},
+            "engenharia": {"nome": "Engenharia do Cardápio", "icone": "📊", "link": "Engenharia_do_Cardapio"},
+            "ficha_tecnica_cozinha": {"nome": "Ficha Técnica (Cozinha)", "icone": "👨‍🍳", "link": "Ficha_Tecnica_Cozinha"},
+            "ficha_tecnica_admin": {"nome": "Ficha Técnica (Administrativa)", "icone": "📈", "link": "Ficha_Tecnica_Administrativa"},
+        }
+
+        # Renderização dos links com destaque dinâmico
+        for chave, item in menu_itens.items():
+            classe = "menu-item"
+            if ativo == chave:
+                classe += " active"
+
+            st.markdown(
+                f"<a href='/{item['link']}' target='_self' class='{classe}'>"
+                f"<span class='menu-icon'>{item['icone']}</span>{item['nome']}</a>",
+                unsafe_allow_html=True
+            )
+
+        # Rodapé do menu
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("<div class='menu-footer'>FichApp v1.0.0</div>", unsafe_allow_html=True)
