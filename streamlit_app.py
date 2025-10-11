@@ -1,4 +1,4 @@
-# streamlit_app.py - CÓDIGO FINAL COM CORREÇÃO DE DEPRECIAÇÃO
+# streamlit_app.py - CÓDIGO FINAL COM TEXTO DE BOAS-VINDAS NO DASHBOARD
 
 # =========================================================
 # FichApp - Sistema de controle de fichas técnicas e insumos
@@ -20,14 +20,31 @@ def load_page_content(page_key):
         # Centraliza a logomarca no cabeçalho
         col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
         with col_img2:
-            # CORREÇÃO CRÍTICA: Usando use_container_width=True para resolver o aviso de depreciação!
             st.image("assets/logo_fichapp.png", use_container_width=True)
 
-        st.markdown("<h1 style='text-align: center;'>FichApp Dashboard</h1>", unsafe_allow_html=True)
+        # Adiciona o título e subtítulo institucional
+        st.markdown("<h1 style='text-align: center;'>Bem-vindo ao FichApp</h1>", unsafe_allow_html=True)
         st.markdown(
-            "<h4 style='text-align: center; color: gray;'>Visão Geral do Sistema de Gestão Interna</h4>",
+            "<h4 style='text-align: center; color: gray;'>Precisão, controle e praticidade — tudo em um só lugar.</h4>",
             unsafe_allow_html=True
         )
+        st.markdown("---")
+        
+        # NOVO: TEXTO INSTITUCIONAL DE BOAS-VINDAS
+        st.markdown("""
+        <div style='padding: 10px 20px; border: 1px solid #1e293b; border-radius: 10px; margin-bottom: 20px; background-color: #0b1220;'>
+            <p style='color: #e5e7eb; font-size: 1.1em;'>
+            O FichApp nasceu da experiência real de um gestor de restaurante que vive diariamente os desafios da operação — do salão ao delivery.
+            </p>
+            <p style='color: #e5e7eb; margin-top: 10px;'>
+            Criado para quem está na linha de frente da gastronomia, o sistema foi desenvolvido com um único propósito: tornar a gestão de fichas técnicas, insumos e custos algo simples, confiável e acessível. Cada funcionalidade foi pensada a partir de dores reais — como a falta de tempo, a dificuldade em padronizar receitas e o desafio de garantir informações precisas para toda a equipe.
+            </p>
+            <p style='color: #e5e7eb; margin-top: 10px; font-weight: bold;'>
+            Com o FichApp, você tem em mãos uma ferramenta feita por quem entende o que acontece dentro de uma cozinha, oferecendo soluções práticas, seguras e eficientes para o seu dia a dia.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.markdown("---")
         
         # --- LINHA DE KPIs (INDICADORES CHAVE) ---
@@ -36,8 +53,6 @@ def load_page_content(page_key):
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            # st.metric (o aviso de depreciação pode estar sendo causado por um dataframe ou widget antigo,
-            # mas vamos manter o código limpo aqui, ele deve desaparecer com a correção da imagem.)
             st.metric(label="Total de Fichas Criadas", value="24", delta="🚀 +2 Fichas")
         with col2:
             st.metric(label="Custo Médio dos Insumos", value="R$ 12,50", delta="🔻 -0.15 R$")
