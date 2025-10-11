@@ -1,11 +1,11 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM AUTOMAÇÃO DE UNIDADES, LIMPEZA E ESTRUTURA DE EDIÇÃO
+# CÓDIGO FINAL COM TABELA MESTRA, MÓDULO DE RELATÓRIOS E CORREÇÃO DE CÁLCULO (V3.0)
 
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 import os, json, random
-from utils.nav import sidebar_menu # Mantenha a importação
+from utils.nav import sidebar_menu 
 
 # =========================================================
 # FUNÇÃO PRINCIPAL DE EXECUÇÃO DA PÁGINA
@@ -13,9 +13,8 @@ from utils.nav import sidebar_menu # Mantenha a importação
 def run_page():
 
     # =========================================================
-    # CONFIG / THEME (Mantido o seu código original)
+    # CONFIG / THEME
     # =========================================================
-    # 📦 Adicionando o ícone ao título para estética
     st.set_page_config(page_title="FichApp — Cadastro de Insumos", page_icon="📦", layout="centered")
 
     DARK_CSS = """
@@ -40,11 +39,7 @@ def run_page():
     """
     st.markdown(DARK_CSS, unsafe_allow_html=True)
 
-    # ... (Seções de Versão, Caminhos dos Dados, Inicialização dos Arquivos mantidas) ...
-    # (Removidas do snippet aqui por serem longas, mas MANTENHA-AS no seu arquivo)
-
-    # --- INÍCIO DE VERSÃO, CAMINHOS E INICIALIZAÇÃO ---
-
+    # ... (Seções de Versão, Caminhos dos Dados) ...
     VERSAO_PATH = "version.json"
     versao_info = {"version": "0.0.0", "released_at": "", "description": ""}
     if os.path.exists(VERSAO_PATH):
@@ -60,7 +55,10 @@ def run_page():
     COMPRAS_CSV = os.path.join(DATA_DIR, "compras_insumos.csv")
     GRUPOS_CSV  = os.path.join(DATA_DIR, "grupos_insumos.csv")
     UNIDS_CSV   = os.path.join(DATA_DIR, "unidades_medida.csv")
+    # Tabela Mestra de Insumos Ativos
+    INSUMOS_ATIVOS_CSV = os.path.join(DATA_DIR, "insumos_ativos.csv")
 
+    # Inicialização dos arquivos (Mantida)
     compras_cols = [
         "data_compra","grupo","insumo_resumo","insumo_completo","marca","tipo",
         "un_med","quantidade_compra","qtde_para_custos",
@@ -86,9 +84,9 @@ def run_page():
         ("L","Litro", 1.0),
         ("ML","Mililitro", 1000.0),
         ("UN","Unidade", 1.0),
-        ("DZ","Dúzia", 12.0), # <--- FATOR CORRIGIDO
-        ("MIL","Milheiro", 1000.0), # <--- FATOR CORRIGIDO
-        ("CT","Cento", 100.0), # <--- FATOR CORRIGIDO
+        ("DZ","Dúzia", 12.0), 
+        ("MIL","Milheiro", 1000.0), 
+        ("CT","Cento", 100.0), 
         ("CX","Caixa", 1.0),
         ("FD","Fardo", 1.0),
         ("PAC","Pacote", 1.0),
@@ -99,11 +97,13 @@ def run_page():
     if (not os.path.exists(UNIDS_CSV)) or os.stat(UNIDS_CSV).st_size == 0:
         pd.DataFrame(unidades_padrao, columns=["codigo","descricao","qtde_padrao"]).to_csv(UNIDS_CSV, index=False)
     
-    # --- FIM DE VERSÃO, CAMINHOS E INICIALIZAÇÃO ---
-
+    # Inicializa Tabela Mestra (insumos_ativos.csv)
+    insumos_ativos_cols = ["insumo_resumo", "grupo", "un_med", "custo_unit_ativo", "data_ultima_compra"]
+    if (not os.path.exists(INSUMOS_ATIVOS_CSV)) or os.stat(INSUMOS_ATIVOS_CSV).st_size == 0:
+        pd.DataFrame(columns=insumos_ativos_cols).to_csv(INSUMOS_ATIVOS_CSV, index=False)
 
     # =========================================================
-    # Helpers (Mantidos os seus)
+    # Helpers (Adicionando a lógica de consolidação)
     # =========================================================
     @st.cache_data
     def carregar_tabela(path: str) -> pd.DataFrame:
@@ -129,12 +129,43 @@ def run_page():
 
     def label_unidade(row):
         return f"{row['codigo']} – {row['descricao']}"
+        
+    def salvar_insumo_ativo(df_compras: pd.DataFrame):
+        """
+        Gera a Tabela Mestra (insumos_ativos.csv) com o custo mais recente de cada insumo.
+        Esta tabela será usada por todas as Fichas Técnicas.
+        """
+        if df_compras.empty:
+            salvar_tabela(pd.DataFrame(columns=insumos_ativos_cols), INSUMOS_ATIVOS_CSV)
+            return
+
+        df_compras["data_compra_obj"] = pd.to_datetime(df_compras["data_compra"], format="%d/%m/%Y")
+        
+        idx = df_compras.groupby(["insumo_resumo"])["data_compra_obj"].idxmax()
+        df_ativo = df_compras.loc[idx].copy()
+        
+        df_ativo = df_ativo[[
+            "insumo_resumo",
+            "grupo",
+            "un_med",
+            "valor_unit_para_custos",
+            "data_compra"
+        ]]
+        
+        df_ativo.columns = [
+            "insumo_resumo",
+            "grupo",
+            "un_med",
+            "custo_unit_ativo",
+            "data_ultima_compra"
+        ]
+        
+        salvar_tabela(df_ativo, INSUMOS_ATIVOS_CSV)
 
 
     # =========================================================
-    # Estado da UI (Melhorado para limpar o formulário)
+    # Estado da UI (Melhorado)
     # =========================================================
-    # Função para limpar o estado da sessão (será chamada após o cadastro)
     def reset_session_state():
         st.session_state["nome_resumo"] = ""
         st.session_state["nome_completo"] = ""
@@ -143,7 +174,6 @@ def run_page():
         st.session_state["last_un_sel"] = None
         st.session_state["last_qtd_compra"] = None
         st.session_state["qtde_para_custos_value"] = 0.0
-        st.session_state["form_data"] = {} # Para limpar outros inputs do formulário
 
     defaults = {
         "nome_resumo": "",
@@ -153,7 +183,6 @@ def run_page():
         "last_un_sel": None,
         "last_qtd_compra": None,
         "qtde_para_custos_value": 0.0,
-        "form_data": {}
     }
     for k,v in defaults.items():
         if k not in st.session_state:
@@ -162,7 +191,6 @@ def run_page():
     # =========================================================
     # Cabeçalho
     # =========================================================
-    # 📦 Ícone adicionado ao título
     st.markdown("<h1>📦 Cadastro de Insumos</h1>", unsafe_allow_html=True)
     acao = st.radio("Ação:", ["➕ Cadastrar novo insumo", "✏️ Editar insumo", "📋 Visualizar insumos"], index=0)
 
@@ -176,7 +204,6 @@ def run_page():
         codigo_por_label = dict(zip(unidades_labels, unidades_df["codigo"]))
         fator_por_codigo = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"]))
 
-        # Usa uma chave única para o formulário principal
         with st.form("cadastro_insumo_form", clear_on_submit=False):
             c1, c2 = st.columns(2)
 
@@ -186,7 +213,8 @@ def run_page():
 
                 grupo = st.selectbox(
                     "Grupo", options=grupos,
-                    index=grupos.index("Embalagem") if "Embalagem" in grupos else 0
+                    index=grupos.index("Embalagem") if "Embalagem" in grupos else 0,
+                    key="grupo_input"
                 )
                 with st.expander("➕ Novo grupo / editar existentes"):
                     novo_grupo = st.text_input("Adicionar novo grupo", key="novo_grupo_input")
@@ -200,14 +228,12 @@ def run_page():
                                 gdf.loc[len(gdf)] = [novo_grupo.strip()]
                                 salvar_tabela(gdf, GRUPOS_CSV)
                                 st.success(f"Grupo “{novo_grupo}” adicionado. Ele já aparece na lista.")
-                                st.stop() # st.stop() ou st.rerun() após salvar dados auxiliares
+                                st.rerun() 
                         else:
                             st.warning("Digite um nome para o novo grupo.")
-                            st.stop()
+                            st.rerun()
 
-                # nomes com cópia automática (pode editar)
                 nome_resumo = st.text_input("Nome resumido do insumo", value=st.session_state["nome_resumo"], key="nome_resumo_input")
-                # ... (Lógica de lock de nomes mantida) ...
                 if nome_resumo != st.session_state["nome_resumo"]:
                     st.session_state["nome_resumo"] = nome_resumo
                     if st.session_state["nome_completo_lock"]:
@@ -237,35 +263,16 @@ def run_page():
                 fator = fator_por_codigo.get(un_med, 1.0)
                 fator = 1.0 if (pd.isna(fator) or fator is None or fator<=0) else float(fator)
 
-                # Se a unidade é algo como KG ou UN (fator=1), a Qtde para Custos é a Quantidade Compra.
-                # Se a unidade é DZ (fator=12), a Qtde para Custos é Qtde Compra * FATOR (1 * 12).
+                # ATUALIZAÇÃO DA QUANTIDADE PARA CUSTOS
                 if st.session_state["last_un_sel"] != un_med or st.session_state["last_qtd_compra"] != quantidade_compra:
-                    # Lógica CORRIGIDA: Se o fator é diferente de 1 (ex: dúzia=12), multiplicamos.
-                    # No código anterior: fator era o divisor (correto para KG->G), mas não para DZ->UN.
-                    # NOVO: Vamos assumir que QTDE_PARA_CUSTOS SEMPRE É UNIDADES OU KG/L.
-                    
-                    # Se for KG/L (fator=1), calculado = quantidade comprada
-                    # Se for DZ (fator=12), calculado = 1 * 12 = 12
-                    
-                    if un_med in ["G", "ML"]:
-                        # Ex: 1 KG (fator=1) * 1000 = 1000g. NÃO.
-                        # Ex: Se a base de custo é KG, e a compra é G, a lógica deve ser inversa.
-                        # VAMOS MANTER A LÓGICA ORIGINAL DO SEU CÓDIGO (DIVISÃO),
-                        # mas garantindo que o fator seja float.
-                        
-                        # Seu código original: calculado = (quantidade_compra / fator) if fator > 1 else quantidade_compra
-                        # (Funciona para KG/G, mas confuso para DZ/UN)
-                        
-                        # ALTERAÇÃO: O cálculo correto para DZ->UN é MULTIPLICAÇÃO.
-                        if un_med in ["DZ", "MIL", "CT", "PAR"]:
-                             calculado = quantidade_compra * fator
-                        else:
-                             calculado = quantidade_compra # Para KG, L, UN, CX, etc.
+                    # Lógica: Se for uma unidade fracionária ou múltipla, multiplicamos pela quantidade comprada.
+                    # Ex: 1 Dúzia * 12 = 12 unidades para custos.
+                    if un_med in ["G", "ML", "DZ", "MIL", "CT", "PAR"]:
+                        calculado = quantidade_compra * fator
+                    else:
+                        calculado = quantidade_compra 
 
-                        st.session_state["qtde_para_custos_value"] = float(calculado)
-                
-                # CORREÇÃO CRÍTICA: Se a unidade foi mudada, o valor_total_compra e o valor_frete
-                # precisam ser usados para recalcular o custo real.
+                    st.session_state["qtde_para_custos_value"] = float(calculado)
                 
                 qtde_para_custos = st.number_input(
                     "Quantidade para custos",
@@ -286,14 +293,12 @@ def run_page():
                 valor_frete = st.number_input("Frete (R$)", min_value=0.0, value=0.0, step=0.01, key="valor_frete_input")
                 percentual_perda = st.number_input("% de perda", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="percentual_perda_input")
 
-                # ... (Expander de Nova Unidade mantido) ...
                 with st.expander("➕ Nova unidade / editar existentes"):
                     nova_abrev = st.text_input("Abreviação (ex.: KG, UN, CT)", max_chars=6, key="nova_abrev_input")
                     nova_desc  = st.text_input("Descrição (ex.: Quilograma)", key="nova_desc_input")
                     nova_qtd_padrao = st.number_input("Fator da unidade (p/ auto-cálculo: MIL=1000, CT=100, DZ=12)", min_value=0.0, value=0.0, step=1.0, key="nova_qtd_padrao_input")
                     add_un = st.form_submit_button("Adicionar unidade", key="add_un_btn")
                     if add_un:
-                        # ... (Lógica de adicionar nova unidade) ...
                         if nova_abrev.strip() and nova_desc.strip():
                             udf = carregar_tabela(UNIDS_CSV)
                             if set(udf.columns) != {"codigo","descricao","qtde_padrao"}:
@@ -301,42 +306,25 @@ def run_page():
                             if nova_abrev.strip().upper() not in udf["codigo"].values:
                                 udf.loc[len(udf)] = [nova_abrev.strip().upper(), nova_desc.strip(), (nova_qtd_padrao or 1.0)]
                                 salvar_tabela(udf, UNIDS_CSV)
-                                st.success(f"Unidade “{nova_abrev.upper()} – {nova_desc}” adicionada.")
-                                st.stop()
+                                st.success(f"Unidade “{nova_abrev.upper()} – {nova_desc}” adicionada. Ele já aparece na lista.")
+                                st.rerun()
                         else:
                             st.warning("Preencha abreviação e descrição.")
-                            st.stop()
+                            st.rerun()
 
 
             # =========================================================
-            # Cálculos automáticos (com perda e frete)
+            # Cálculos automáticos (Pré-visualização)
             # =========================================================
             valor_unit_bruto = (valor_total_compra / quantidade_compra) if quantidade_compra > 0 else 0.0
             custo_total_com_frete = valor_total_compra + valor_frete
             
-            # Quantidade líquida APÓS PERDA, na unidade de COMPRA
             quantidade_liquida = quantidade_compra * (1 - percentual_perda/100.0) if quantidade_compra > 0 else 0.0
-            
-            # Custo real por unidade de COMPRA (ex: R$ por DÚZIA)
             custo_real_unitario = (custo_total_com_frete / quantidade_liquida) if quantidade_liquida > 0 else 0.0
             
-            # Custo Unitário p/ Custos (O divisor deve ser a QTDE PARA CUSTOS, que é a quantidade já ajustada)
-            # CORREÇÃO DE CÁLCULO: Custo total com frete / Qtde para custos (Qtde comp. ajustada pelo fator e perda)
-            # Seu cálculo estava confuso: (custo_real_unitario / qtde_para_custos)
-            # O cálculo CORRETO é: (Custo Total com Frete) / (Qtde para Custos * (1 - Perda))
-            
-            # Para simplificar, vamos usar o custo real por unidade de COMPRA (custo_real_unitario) 
-            # e DIVIDIR pelo FATOR de conversão.
-            
-            # NOVO CÁLCULO: (Custo Real Unitário por UNIDADE DE COMPRA) / (Fator que ajusta a unidade de compra para a unidade base de custo)
-            
-            # Vamos usar a lógica mais robusta:
-            # 1. Custo Real por unidade de COMPRA (ex: R$ 13 / 1 DZ = R$ 13/DZ)
-            # 2. Qtde Líquida AJUSTADA para custos (ex: 1 DZ (12) * 90% = 10.8 UNIDADES para custos)
+            # CÁLCULO FINAL CORRETO: Custo na UNIDADE BASE de CUSTOS (Qtde ajustada por FATOR e PERDA)
             qtde_para_custos_ajustada_por_perda = qtde_para_custos * (1 - percentual_perda/100.0)
-            
             valor_unit_para_custos = (custo_total_com_frete / qtde_para_custos_ajustada_por_perda) if qtde_para_custos_ajustada_por_perda > 0 else 0.0
-
 
             st.markdown("### 💰 Pré-visualização dos cálculos")
             left, right = st.columns(2)
@@ -345,14 +333,10 @@ def run_page():
                 st.write(f"**Custo total com frete:** R$ {custo_total_com_frete:.2f}")
                 st.write(f"**Quantidade líquida (após perda):** {quantidade_liquida:.4f} {un_med}")
             with right:
-                # Custo Real Unitário na UNIDADE DE COMPRA
-                st.write(f"**Custo real unitário:** R$ {custo_real_unitario:.4f}") 
-                # Custo na UNIDADE BASE de CUSTOS
-                st.write(f"**Custo unitário p/ custos:** R$ {valor_unit_para_custos:.6f}")
+                st.write(f"**Custo real unitário (por UNID. COMPRA):** R$ {custo_real_unitario:.4f}") 
+                st.write(f"**Custo unitário p/ custos (UNID. BASE):** R$ {valor_unit_para_custos:.6f}")
 
-            # =========================================================
-            # Fornecedor / Observações
-            # =========================================================
+            # ... (Fornecedor / Observações mantido) ...
             st.markdown("### 🧾 Fornecedor e contato (opcional)")
             c3, c4 = st.columns(2)
             with c3:
@@ -363,7 +347,6 @@ def run_page():
                 representante = st.text_input("Representante", key="representante_input")
                 observacao = st.text_area("Observação", key="observacao_input")
 
-            # Botão de envio (será acionado após a validação do formulário)
             enviado = st.form_submit_button("💾 Salvar Insumo")
 
         # Persistência
@@ -371,7 +354,8 @@ def run_page():
             if not st.session_state["nome_resumo"].strip() or quantidade_compra <= 0 or valor_total_compra <= 0:
                  st.error("Campos obrigatórios: Nome Resumido, Quantidade Comprada e Valor Total.")
             else:
-                df = carregar_tabela(COMPRAS_CSV)
+                # 1. Salva a compra histórica
+                df_compras = carregar_tabela(COMPRAS_CSV)
                 novo = {
                     "data_compra": data_compra.strftime("%d/%m/%Y"),
                     "grupo": grupo,
@@ -397,14 +381,17 @@ def run_page():
                     "observacao": observacao,
                     "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
-                df = pd.concat([df, pd.DataFrame([novo])], ignore_index=True)
-                salvar_tabela(df, COMPRAS_CSV)
+                df_compras = pd.concat([df_compras, pd.DataFrame([novo])], ignore_index=True)
+                salvar_tabela(df_compras, COMPRAS_CSV)
 
-                # CORREÇÃO PARA LIMPAR O FORMULÁRIO APÓS SALVAR
+                # 2. Salva ou atualiza a Tabela Mestra Ativa
+                salvar_insumo_ativo(df_compras)
+
+                # CORREÇÃO: LIMPAR O FORMULÁRIO APÓS SALVAR
                 reset_session_state()
                 
                 st.success(f"Insumo **{novo['insumo_resumo']}** salvo com sucesso! Formulário resetado para novo cadastro.")
-                st.rerun() # Recarrega a página para exibir o formulário limpo
+                st.rerun() 
 
     # =========================================================
     # EDITAR (Estrutura de edição)
@@ -414,28 +401,62 @@ def run_page():
         if df_compras.empty:
             st.info("Nenhum insumo cadastrado para edição. Cadastre um novo primeiro. 🙂")
         else:
-            # Dropdown para selecionar o insumo a ser editado
-            insumos_list = df_compras["insumo_resumo"].unique().tolist()
+            insumos_list = sorted(df_compras["insumo_resumo"].unique().tolist())
             insumo_selecionado = st.selectbox("Selecione o insumo para editar:", insumos_list)
             
-            # Aqui entraria o código para carregar os dados do insumo selecionado
             st.info(f"O formulário de edição do insumo **{insumo_selecionado}** será carregado aqui em breve.")
 
     # =========================================================
-    # LISTA (Mantido)
+    # LISTA (MÓDULO DE RELATÓRIOS)
     # =========================================================
     elif acao == "📋 Visualizar insumos":
-        st.markdown("### 📋 Lista de Insumos Cadastrados")
-        lista_df = carregar_tabela(COMPRAS_CSV)
-        if lista_df.empty:
-            st.info("Nenhum insumo cadastrado ainda.")
+        st.markdown("### 📋 Relatório de Insumos Ativos")
+        
+        df_ativos = carregar_tabela(INSUMOS_ATIVOS_CSV)
+        
+        if df_ativos.empty:
+            st.info("Nenhum insumo ativo encontrado. Cadastre um novo primeiro.")
         else:
-            st.dataframe(lista_df, use_container_width=True)
+            c1, c2 = st.columns([2, 1])
+            
+            grupos_disponiveis = ["Todos"] + sorted(df_ativos["grupo"].unique().tolist())
+            grupo_filtro = c1.selectbox("Filtrar por Grupo:", grupos_disponiveis, index=0)
+            
+            termo_busca = c2.text_input("Buscar por Nome:", value="").strip().lower()
+
+            df_filtrado = df_ativos.copy()
+            
+            if grupo_filtro != "Todos":
+                df_filtrado = df_filtrado[df_filtrado["grupo"] == grupo_filtro]
+            
+            if termo_busca:
+                df_filtrado = df_filtrado[
+                    df_filtrado["insumo_resumo"].str.lower().str.contains(termo_busca, na=False) |
+                    df_filtrado["grupo"].str.lower().str.contains(termo_busca, na=False)
+                ]
+            
+            st.dataframe(
+                df_filtrado.rename(columns={
+                    "insumo_resumo": "Insumo",
+                    "grupo": "Grupo",
+                    "un_med": "Unidade Base",
+                    "custo_unit_ativo": "Custo Unitário Ativo (R$)",
+                    "data_ultima_compra": "Última Compra"
+                }), 
+                use_container_width=True,
+                column_config={
+                    "Custo Unitário Ativo (R$)": st.column_config.NumberColumn(
+                        format="R$ %0.6f"
+                    )
+                }
+            )
+
+            st.caption(f"Total de insumos ativos: {len(df_filtrado)}")
+
 
     # =========================================================
     # Rodapé com versão + versículo (Mantido)
     # =========================================================
-    # ... (código do rodapé mantido) ...
     versiculos = [
         ("E tudo quanto fizerdes, fazei-o de todo o coração, como ao Senhor.", "Colossenses 3:23"),
         ("O Senhor é meu pastor; nada me faltará.", "Salmo 23:1"),
