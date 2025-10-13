@@ -1,5 +1,5 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM CORREÇÃO ESTRUTURAL E FLUXO DE 2 ABAS (V8.0)
+# CÓDIGO FINAL COM CORREÇÃO DE ESCOPO (V8.0 - ESTRUTURA FINAL)
 
 import streamlit as st
 import pandas as pd
@@ -155,7 +155,7 @@ def run_page():
         salvar_tabela(df_ativo, INSUMOS_ATIVOS_CSV)
 
     # =========================================================
-    # Estado da UI & Funções de Edição/Reset
+    # Estado da UI & Funções de Edição/Reset (Mantido)
     # =========================================================
     def reset_session_state():
         st.session_state["nome_resumo"] = ""
@@ -174,7 +174,7 @@ def run_page():
     defaults = {
         "nome_resumo": "", "nome_completo": "", "nome_completo_lock": True,
         "current_edit_insumo": None, "current_edit_data": {}, 
-        "acao_manual_change": False, # Controla se o usuário clicou no rádio button
+        "acao_manual_change": False, 
         # Default para as chaves movidas para fora do form
         "qtde_compra_key": 0.0, "valor_total_compra_key": 0.0, "valor_frete_key": 0.0, "percentual_perda_key": 0.0,
         "un_med_select_key": "UN", "qtde_para_custos_value": 0.0,
@@ -186,10 +186,8 @@ def run_page():
 
     def load_insumo_data(insumo_resumo):
         df_compras = carregar_tabela(COMPRAS_CSV)
-        # Pega a última compra do insumo
         ultima_compra = df_compras[df_compras['insumo_resumo'] == insumo_resumo].sort_values(by='atualizado_em', ascending=False).iloc[0]
         
-        # Preenche os campos do st.session_state para refletir no formulário
         st.session_state["nome_resumo"] = ultima_compra["insumo_resumo"]
         st.session_state["nome_completo"] = ultima_compra["insumo_completo"]
         st.session_state.qtde_compra_key = float(ultima_compra["quantidade_compra"])
@@ -197,44 +195,51 @@ def run_page():
         st.session_state.valor_frete_key = float(ultima_compra["valor_frete"])
         st.session_state.percentual_perda_key = float(ultima_compra["percentual_perda"])
         st.session_state.un_med_select_key = ultima_compra["un_med"]
-        st.session_state["qtde_para_custos_value"] = float(ultima_compra["qtde_para_custos"]) # O valor já calculado
+        st.session_state["qtde_para_custos_value"] = float(ultima_compra["qtde_para_custos"]) 
         
         st.session_state["current_edit_data"] = ultima_compra.to_dict()
         st.session_state.current_edit_insumo = insumo_resumo
-        st.session_state.current_page_action = "Edição" # Altera para o modo de edição
+        st.session_state.current_page_action = "Edição" 
         
         st.rerun()
 
     # Callback para o botão de Edição na tabela
     if 'edit_insumo_trigger' in st.session_state and st.session_state.edit_insumo_trigger:
         insumo_a_editar = st.session_state.edit_insumo_trigger
-        st.session_state.edit_insumo_trigger = None # Reseta o gatilho
+        st.session_state.edit_insumo_trigger = None 
         load_insumo_data(insumo_a_editar)
 
 
     # =========================================================
-    # CÁLCULO AUTOMÁTICO DE QTDE PARA CUSTOS
+    # INICIALIZAÇÃO E CÁLCULO (Correção de Escopo)
     # =========================================================
+    # Inicializa as variáveis necessárias para o cálculo e a UI
+    grupos = lista_grupos()
+    unidades_df = lista_unidades()
+    unidades_labels = unidades_df.apply(label_unidade, axis=1).tolist()
+    codigo_por_label = dict(zip(unidades_labels, unidades_df["codigo"]))
+    # ESSA É A VARIÁVEL QUE ESTAVA DANDO ERRO DE ESCOPO
+    fator_por_codigo = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"]))
     
+    # 1. Pega os valores atuais do estado (as chaves dos inputs fora do form)
     current_un_med = st.session_state.get('un_med_select_key', "UN")
     current_qtde_compra = st.session_state.get('qtde_compra_key', 0.0)
 
     fator = fator_por_codigo.get(current_un_med, 1.0)
     fator = 1.0 if (pd.isna(fator) or fator is None or fator<=0) else float(fator)
 
+    # LÓGICA DE CÁLCULO (Quantidade comprada * Fator)
     if current_un_med in ["G", "ML", "DZ", "MIL", "CT", "PAR"]:
         calculated_qtde_custos = current_qtde_compra * fator
     else:
         calculated_qtde_custos = current_qtde_compra
     
-    # 2. Se o cálculo mudou E não for edição (onde o valor é fixo), atualiza o state
+    # 2. Se o cálculo mudou E não for edição, atualiza o state (força a automação)
     if st.session_state.current_page_action == "Cadastro":
         if st.session_state["qtde_para_custos_value"] != float(calculated_qtde_custos):
             st.session_state["qtde_para_custos_value"] = float(calculated_qtde_custos)
-            # Rerun é necessário aqui para atualizar o campo de input
-            # Este RERUN está implicito pelo st.session_state update no topo do script
 
-    # Garante que as variáveis de cálculo tenham os valores mais recentes
+    # Garante que as variáveis de cálculo tenham os valores mais recentes para uso posterior
     qtde_compra_final = st.session_state.qtde_compra_key
     qtde_custos_final = st.session_state["qtde_para_custos_value"]
     valor_total_compra = st.session_state.valor_total_compra_key
@@ -248,22 +253,37 @@ def run_page():
     st.markdown("<h1>📦 Cadastro de Insumos</h1>", unsafe_allow_html=True)
     
     # --- NOVO RADIO BUTTON DE 2 OPÇÕES ---
-    acao = st.radio("Ação:", ["➕ Cadastrar novo insumo", "📋 Visualizar insumos (e Editar)"], 
-                    index=0 if st.session_state.current_page_action in ["Cadastro", "Edição"] else 1,
-                    key="acao_radio",
-                    on_change=reset_acao_and_state)
-
-    if acao == "➕ Cadastrar novo insumo" and st.session_state.current_page_action != "Cadastro":
-        st.session_state.current_page_action = "Cadastro"
-        reset_session_state()
-        st.rerun()
-    elif acao == "📋 Visualizar insumos (e Editar)" and st.session_state.current_page_action not in ["Visualizar", "Edição"]:
-        st.session_state.current_page_action = "Visualizar"
-        st.session_state.current_edit_insumo = None # Limpa qualquer edição pendente
-        reset_session_state()
-        st.rerun()
-
     
+    # Determina o índice ativo
+    if st.session_state.current_page_action == "Cadastro":
+        index_acao = 0
+    elif st.session_state.current_page_action in ["Visualizar", "Edição"]:
+        index_acao = 1
+    else:
+        index_acao = 0 # Default
+
+    def set_page_action_and_reset(new_action):
+        # Ação de reset que reseta o state e o acao_radio antes de mudar a action principal
+        st.session_state.acao_manual_change = True
+        st.session_state.current_edit_insumo = None 
+        if new_action != st.session_state.current_page_action:
+            reset_session_state()
+            st.session_state.current_page_action = new_action
+            st.rerun()
+
+    # Callback para o Radio Button
+    def handle_radio_change():
+        if st.session_state.acao_radio == "➕ Cadastrar novo insumo":
+            set_page_action_and_reset("Cadastro")
+        elif st.session_state.acao_radio == "📋 Visualizar insumos (e Editar)":
+            set_page_action_and_reset("Visualizar")
+
+    acao = st.radio("Ação:", ["➕ Cadastrar novo insumo", "📋 Visualizar insumos (e Editar)"], 
+                    index=index_acao,
+                    key="acao_radio",
+                    on_change=handle_radio_change)
+    
+
     # =========================================================
     # MODO EDIÇÃO (Formulário Carregado)
     # =========================================================
@@ -276,9 +296,6 @@ def run_page():
         col_compra_data, col_compra_qtde = st.columns(2)
         
         # Valores para preencher os select boxes na Edição
-        unidades_labels = unidades_df.apply(label_unidade, axis=1).tolist()
-        grupos = lista_grupos()
-        
         grupo_index = grupos.index(edit_data.get("grupo")) if edit_data.get("grupo") in grupos else 0
         un_label_sel = f"{edit_data.get('un_med')} – {unidades_df[unidades_df['codigo'] == edit_data.get('un_med')].iloc[0]['descricao']}" if edit_data.get("un_med") in unidades_df['codigo'].values and not unidades_df[unidades_df['codigo'] == edit_data.get('un_med')].empty else unidades_labels[0]
         un_label_index = unidades_labels.index(un_label_sel) if un_label_sel in unidades_labels else 0
@@ -314,6 +331,7 @@ def run_page():
 
         # --- FORMULÁRIO DE EDIÇÃO (Dados não interativos) ---
         with st.form("edicao_insumo_form", clear_on_submit=False):
+            st.subheader("2. Detalhes do Insumo e Fornecedor")
             c1, c2 = st.columns(2)
             
             with c1:
@@ -333,7 +351,8 @@ def run_page():
             editado = st.form_submit_button("✅ Salvar Compra Corrigida/Atualizada")
 
             if editado:
-                st.error("ERRO: A lógica de salvamento da edição ainda não está implementada. Volte em breve!")
+                # TODO: Lógica de salvar como NOVA COMPRA (com data de hoje)
+                st.info("A lógica de salvamento da edição (que gera uma nova compra no histórico) será implementada na próxima fase. A edição está funcionando visualmente!")
                 st.rerun()
 
 
@@ -545,8 +564,10 @@ def run_page():
             df_display = df_filtrado.copy()
             
             # Função para criar o botão HTML (o valor da key é o insumo_resumo)
+            # O st.dataframe não suporta botões diretos, usaremos o workaround de TextColumn + st.button
             def create_edit_button(insumo_resumo):
-                return f'<button class="edit-button-style" onclick="document.getElementById(\'edit_trigger_{insumo_resumo}\').click();">Editar</button>'
+                # Este é o texto que aparece na coluna. É só um placeholder.
+                return 'Editar' 
 
             df_display['Ações'] = df_display['insumo_resumo'].apply(create_edit_button)
 
@@ -557,29 +578,43 @@ def run_page():
                 "Ações": "Ações"
             }
             
-            st.dataframe(
+            # Lista de insumos para os botões ocultos
+            insumos_com_acao = df_filtrado['insumo_resumo'].tolist()
+
+            # Renderiza a tabela
+            edited_df = st.data_editor(
                 df_display.rename(columns=cols_map)[list(cols_map.values())],
                 use_container_width=True,
+                disabled=list(cols_map.values()), # Desabilita todas as colunas
                 column_config={
                     "Custo Unitário Ativo (R$)": st.column_config.NumberColumn(
                         format="R$ %0.6f"
                     ),
-                    "Ações": st.column_config.TextColumn(
-                        # Permite que o HTML do botão seja renderizado
-                        # O st.markdown abaixo cuidará do clique
+                    "Ações": st.column_config.Column(
+                        # A coluna de ações agora é apenas um texto estático
                     )
-                }
+                },
+                key="insumos_data_editor"
             )
-            
-            st.caption(f"Total de insumos ativos: {len(df_filtrado)}")
-            
+
             # --- CAPTURA DE CLIQUE NO BOTÃO DE EDIÇÃO ---
-            # Para cada linha, cria um st.button oculto para capturar o clique do HTML
-            for insumo in df_filtrado['insumo_resumo']:
-                if st.button(f"Editar {insumo}", key=f"edit_trigger_{insumo}"):
-                    # Este callback dispara o load_insumo_data e muda o estado para Edição
-                    st.session_state.edit_insumo_trigger = insumo
-                    st.rerun()
+            # Para cada insumo, coloca um botão abaixo da tabela que dispara a edição
+            st.markdown("---")
+            st.markdown("Clique no botão abaixo para editar a última compra de um insumo:")
+            
+            colunas_botoes = st.columns(min(len(insumos_com_acao), 5))
+            
+            for i, insumo in enumerate(insumos_com_acao):
+                if i < 5: # Limita a 5 colunas para estética
+                    with colunas_botoes[i]:
+                        if st.button(f"Editar: {insumo}", key=f"edit_trigger_{insumo}", use_container_width=True):
+                            st.session_state.edit_insumo_trigger = insumo
+                            st.rerun()
+                else:
+                     # Para os demais, coloca em uma linha abaixo
+                     if st.button(f"Editar: {insumo}", key=f"edit_trigger_{insumo}_full"):
+                            st.session_state.edit_insumo_trigger = insumo
+                            st.rerun()
 
 
     # =========================================================
