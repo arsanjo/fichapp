@@ -1,5 +1,5 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM CORREÇÃO DE INICIALIZAÇÃO E FLUXO DE 2 ABAS (V8.1)
+# CÓDIGO FINAL COM CORREÇÃO DE ESCOPO E INICIALIZAÇÃO (V8.2 - ESTRUTURA FINAL)
 
 import streamlit as st
 import pandas as pd
@@ -211,14 +211,14 @@ def run_page():
 
 
     # =========================================================
-    # INICIALIZAÇÃO E CÁLCULO (Correção Definitiva de Escopo)
+    # INICIALIZAÇÃO E CÁLCULO (Correção de Escopo)
     # =========================================================
     
     grupos = lista_grupos()
     unidades_df = lista_unidades()
     unidades_labels = unidades_df.apply(label_unidade, axis=1).tolist()
     codigo_por_label = dict(zip(unidades_labels, unidades_df["codigo"]))
-    fator_por_codigo = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"])) # Variável corrigida
+    fator_por_codigo = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"])) 
     
     # 1. Pega os valores atuais do estado (as chaves dos inputs fora do form)
     current_un_med = st.session_state.get('un_med_select_key', "UN")
@@ -299,14 +299,20 @@ def run_page():
              grupo_index = grupos.index(edit_data.get("grupo"))
         except ValueError:
              grupo_index = 0
+             
+        un_codes_list = unidades_df["codigo"].to_list()
+        un_default_index_for_edit = 0
+        try:
+             # Correção de inicialização: busca o índice do código de unidade
+             un_default_index_for_edit = un_codes_list.index(edit_data.get("un_med", "UN"))
+        except ValueError:
+             un_default_index_for_edit = 0
 
-        un_label_sel = f"{edit_data.get('un_med')} – {unidades_df[unidades_df['codigo'] == edit_data.get('un_med')].iloc[0]['descricao']}" if edit_data.get("un_med") in unidades_df['codigo'].values and not unidades_df[unidades_df['codigo'] == edit_data.get('un_med')].empty else unidades_labels[0]
-        un_label_index = unidades_labels.index(un_label_sel) if un_label_sel in unidades_labels else 0
         data_compra_val = pd.to_datetime(edit_data.get("data_compra"), format="%d/%m/%Y", errors='coerce').date() if edit_data.get("data_compra") else date.today()
 
         with col_compra_data:
             st.date_input("Data da compra (Última Compra)", value=data_compra_val, format="DD/MM/YYYY", key="edit_data_compra")
-            st.selectbox("Unidade de medida", options=unidades_labels, index=un_label_index, key="edit_un_label_sel")
+            st.selectbox("Unidade de medida", options=unidades_labels, index=un_default_index_for_edit, key="edit_un_label_sel")
             st.number_input("Quantidade comprada", min_value=0.0, value=qtde_compra_final, step=0.01, key="edit_quantidade_compra")
             st.selectbox("Grupo", options=grupos, index=grupo_index, key="edit_grupo")
             
@@ -369,11 +375,14 @@ def run_page():
         # --- BLOCO DE INPUTS INTERATIVOS (FORA DO FORM) ---
         col_compra_data, col_compra_qtde = st.columns(2)
         
-        # Encontra o índice correto do selectbox
+        # Encontra o índice correto do selectbox (usando a lógica mais segura)
+        un_codes_list = unidades_df["codigo"].to_list()
+        un_default_index_for_cad = 0
         try:
-             un_default_index = unidades_df.index[unidades_df["codigo"]==st.session_state.un_med_select_key].tolist()[0]
-        except IndexError:
-             un_default_index = 0
+             # Correção de inicialização: busca o índice do código de unidade
+             un_default_index_for_cad = un_codes_list.index(st.session_state.un_med_select_key)
+        except ValueError:
+             un_default_index_for_cad = 0
 
         try:
              grupo_default_index = grupos.index(st.session_state.get('grupo_input_cad', grupos[0]))
@@ -386,7 +395,7 @@ def run_page():
             
             un_label_sel = st.selectbox(
                 "Unidade de medida", options=unidades_labels,
-                index=un_default_index,
+                index=un_default_index_for_cad,
                 key="un_med_select_key" 
             )
             un_med_current = codigo_por_label[un_label_sel]
@@ -606,12 +615,15 @@ def run_page():
             st.markdown("---")
             st.markdown("Selecione o insumo para editar a última compra:")
             
-            # Opção de Edição (selectbox)
-            insumo_selecionado = st.selectbox("Insumo:", insumos_com_acao, key="selectbox_edicao_insumo")
-            
-            if st.button(f"✏️ Editar última compra de: {insumo_selecionado}", key="trigger_edit_btn"):
-                st.session_state.edit_insumo_trigger = insumo_selecionado
-                st.rerun()
+            # Se o filtro não retornou insumos, não mostra o seletor de edição.
+            if insumos_com_acao:
+                insumo_selecionado = st.selectbox("Insumo:", insumos_com_acao, key="selectbox_edicao_insumo")
+                
+                if st.button(f"✏️ Editar última compra de: {insumo_selecionado}", key="trigger_edit_btn"):
+                    st.session_state.edit_insumo_trigger = insumo_selecionado
+                    st.rerun()
+            else:
+                st.info("Nenhum insumo corresponde aos filtros para edição.")
 
 
     # =========================================================
