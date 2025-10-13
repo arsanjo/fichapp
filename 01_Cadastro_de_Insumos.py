@@ -1,11 +1,11 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM CORREÇÃO DE ESCOPO E INICIALIZAÇÃO (V8.2 - ESTRUTURA FINAL)
+# CÓDIGO FINAL COM ESTRUTURA DE 2 ABAS E CORREÇÃO DE ERRO DE ÍNDICE (V8.3)
 
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 import os, json, random
-from utils.nav import sidebar_menu 
+# from utils.nav import sidebar_menu # Comentado porque não é usado no script principal
 
 # =========================================================
 # FUNÇÃO PRINCIPAL DE EXECUÇÃO DA PÁGINA
@@ -155,7 +155,7 @@ def run_page():
         salvar_tabela(df_ativo, INSUMOS_ATIVOS_CSV)
 
     # =========================================================
-    # Estado da UI & Funções de Edição/Reset (Mantido)
+    # Estado da UI & Funções de Edição/Reset
     # =========================================================
     def reset_session_state():
         st.session_state["nome_resumo"] = ""
@@ -170,15 +170,16 @@ def run_page():
         st.session_state.percentual_perda_key = 0.0
         st.session_state.un_med_select_key = "UN"
         st.session_state["qtde_para_custos_value"] = 0.0
+        st.session_state.acao_radio = "➕ Cadastrar novo insumo" # Garante o radio button no estado inicial
 
     defaults = {
         "nome_resumo": "", "nome_completo": "", "nome_completo_lock": True,
         "current_edit_insumo": None, "current_edit_data": {}, 
         "acao_manual_change": False, 
-        # Default para as chaves movidas para fora do form
         "qtde_compra_key": 0.0, "valor_total_compra_key": 0.0, "valor_frete_key": 0.0, "percentual_perda_key": 0.0,
         "un_med_select_key": "UN", "qtde_para_custos_value": 0.0,
-        "current_page_action": "Cadastro" # Controla o estado principal (Cadastro vs Visualizar/Edição)
+        "current_page_action": "Cadastro",
+        "acao_radio": "➕ Cadastrar novo insumo"
     }
     for k,v in defaults.items():
         if k not in st.session_state:
@@ -186,8 +187,15 @@ def run_page():
 
     def load_insumo_data(insumo_resumo):
         df_compras = carregar_tabela(COMPRAS_CSV)
-        ultima_compra = df_compras[df_compras['insumo_resumo'] == insumo_resumo].sort_values(by='atualizado_em', ascending=False).iloc[0]
-        
+        # Tenta encontrar a última compra
+        try:
+             ultima_compra = df_compras[df_compras['insumo_resumo'] == insumo_resumo].sort_values(by='atualizado_em', ascending=False).iloc[0]
+        except IndexError:
+             st.error(f"Erro: Insumo '{insumo_resumo}' não encontrado ou sem histórico de compras.")
+             st.session_state.current_page_action = "Visualizar"
+             st.rerun()
+             return
+
         st.session_state["nome_resumo"] = ultima_compra["insumo_resumo"]
         st.session_state["nome_completo"] = ultima_compra["insumo_completo"]
         st.session_state.qtde_compra_key = float(ultima_compra["quantidade_compra"])
@@ -200,6 +208,7 @@ def run_page():
         st.session_state["current_edit_data"] = ultima_compra.to_dict()
         st.session_state.current_edit_insumo = insumo_resumo
         st.session_state.current_page_action = "Edição" 
+        st.session_state.acao_radio = "📋 Visualizar insumos (e Editar)" # Altera o rádio para Edição
         
         st.rerun()
 
@@ -211,7 +220,7 @@ def run_page():
 
 
     # =========================================================
-    # INICIALIZAÇÃO E CÁLCULO (Correção de Escopo)
+    # INICIALIZAÇÃO E CÁLCULO
     # =========================================================
     
     grupos = lista_grupos()
@@ -251,16 +260,11 @@ def run_page():
     # =========================================================
     st.markdown("<h1>📦 Cadastro de Insumos</h1>", unsafe_allow_html=True)
     
-    # --- NOVO RADIO BUTTON DE 2 OPÇÕES ---
+    # --- RADIO BUTTON (Removendo a opção de 3, forçando o novo fluxo) ---
     
     # Determina o índice ativo
-    if st.session_state.current_page_action == "Cadastro":
-        index_acao = 0
-    elif st.session_state.current_page_action in ["Visualizar", "Edição"]:
-        index_acao = 1
-    else:
-        index_acao = 0 
-
+    index_acao = 0 if st.session_state.current_page_action in ["Cadastro", "Edição"] else 1
+    
     # Handler para o reset e troca de aba
     def set_page_action_and_reset(new_action):
         st.session_state.acao_manual_change = True
@@ -272,14 +276,14 @@ def run_page():
 
     # Callback para o Radio Button
     def handle_radio_change():
-        if st.session_state.acao_radio == "➕ Cadastrar novo insumo":
+        if st.session_state.acao_radio_key == "➕ Cadastrar novo insumo":
             set_page_action_and_reset("Cadastro")
-        elif st.session_state.acao_radio == "📋 Visualizar insumos (e Editar)":
+        elif st.session_state.acao_radio_key == "📋 Visualizar insumos (e Editar)":
             set_page_action_and_reset("Visualizar")
 
     acao = st.radio("Ação:", ["➕ Cadastrar novo insumo", "📋 Visualizar insumos (e Editar)"], 
                     index=index_acao,
-                    key="acao_radio",
+                    key="acao_radio_key", # Alterado para evitar conflito
                     on_change=handle_radio_change)
     
 
@@ -303,7 +307,7 @@ def run_page():
         un_codes_list = unidades_df["codigo"].to_list()
         un_default_index_for_edit = 0
         try:
-             # Correção de inicialização: busca o índice do código de unidade
+             # Correção de inicialização: busca o índice do código de unidade (seguro)
              un_default_index_for_edit = un_codes_list.index(edit_data.get("un_med", "UN"))
         except ValueError:
              un_default_index_for_edit = 0
@@ -379,7 +383,6 @@ def run_page():
         un_codes_list = unidades_df["codigo"].to_list()
         un_default_index_for_cad = 0
         try:
-             # Correção de inicialização: busca o índice do código de unidade
              un_default_index_for_cad = un_codes_list.index(st.session_state.un_med_select_key)
         except ValueError:
              un_default_index_for_cad = 0
@@ -524,6 +527,7 @@ def run_page():
                 reset_session_state()
                 st.session_state.acao_manual_change = False
                 st.session_state.current_page_action = "Visualizar" # Manda o usuário para o relatório
+                st.session_state.acao_radio_key = "📋 Visualizar insumos (e Editar)" # Atualiza o radio
                 
                 st.success(f"Insumo **{novo['insumo_resumo']}** salvo com sucesso! Formulário resetado para novo cadastro.")
                 st.rerun() 
@@ -581,7 +585,7 @@ def run_page():
             
             # --- INTEGRAÇÃO COM EDIÇÃO ---
             st.markdown("---")
-            st.caption("A tabela abaixo mostra o custo ativo de cada insumo. Clique em **Editar** para ajustar a última compra.")
+            st.caption("A tabela abaixo mostra o custo ativo de cada insumo. Use o seletor abaixo para editar a última compra.")
 
             # Adiciona a coluna de Ações
             df_display = df_filtrado.copy()
@@ -615,7 +619,6 @@ def run_page():
             st.markdown("---")
             st.markdown("Selecione o insumo para editar a última compra:")
             
-            # Se o filtro não retornou insumos, não mostra o seletor de edição.
             if insumos_com_acao:
                 insumo_selecionado = st.selectbox("Insumo:", insumos_com_acao, key="selectbox_edicao_insumo")
                 
