@@ -1,5 +1,5 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM CORREÇÃO DE ERRO DE MODIFICAÇÃO DE WIDGET (V8.6 - Estabilidade Total)
+# CÓDIGO FINAL COM CORREÇÃO DEFINITIVA DO ERRO DE RADIO BUTTON (V8.7 - Estabilidade Total)
 
 import streamlit as st
 import pandas as pd
@@ -155,7 +155,6 @@ def run_page():
     # =========================================================
     # Estado da UI & Funções de Edição/Reset
     # =========================================================
-    # VARIÁVEL DE ESTADO PARA MONITORAR O ÚLTIMO VALOR (SIMPLIFICADA)
     if 'qtde_para_custos_last_value' not in st.session_state:
         st.session_state.qtde_para_custos_last_value = 0.0
 
@@ -165,16 +164,21 @@ def run_page():
         st.session_state["nome_completo_lock"] = True
         st.session_state.current_edit_insumo = None
         st.session_state.current_edit_data = {}
+        # Reseta os inputs
         st.session_state.qtde_compra_key = 0.0
         st.session_state.valor_total_compra_key = 0.0
         st.session_state.valor_frete_key = 0.0
         st.session_state.percentual_perda_key = 0.0
+        # Reseta as chaves de controle
         st.session_state.un_med_select_key = "UN"
         st.session_state["qtde_para_custos_value"] = 0.0
         st.session_state.current_page_action = "Cadastro"
         st.session_state.acao_radio_key = "➕ Cadastrar novo insumo"
         st.session_state.qtde_para_custos_last_value = 0.0
         st.session_state.un_med_select_key_label = "UN – Unidade" 
+        # Re-inicializa a chave de input para forçar o reset do widget
+        st.session_state["qtde_para_custos_final_key"] = 0.0 
+
 
     defaults = {
         "nome_resumo": "", "nome_completo": "", "nome_completo_lock": True,
@@ -185,7 +189,8 @@ def run_page():
         "current_page_action": "Cadastro",
         "acao_radio_key": "➕ Cadastrar novo insumo",
         "qtde_para_custos_last_value": 0.0,
-        "un_med_select_key_label": "UN – Unidade"
+        "un_med_select_key_label": "UN – Unidade",
+        "qtde_para_custos_final_key": 0.0 # Valor inicial do widget de input
     }
     for k,v in defaults.items():
         if k not in st.session_state:
@@ -222,6 +227,7 @@ def run_page():
         st.session_state.current_page_action = "Edição" 
         st.session_state.acao_radio_key = "📋 Visualizar insumos (e Editar)"
         st.session_state.qtde_para_custos_last_value = float(ultima_compra["qtde_para_custos"]) # Atualiza o last value para edição
+        st.session_state["qtde_para_custos_final_key"] = float(ultima_compra["qtde_para_custos"])
 
         st.rerun()
 
@@ -252,22 +258,17 @@ def run_page():
     codigo_por_label = dict(zip(unidades_labels, unidades_df["codigo"]))
     fator_por_codigo = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"])) 
     
-    # 1. Pega os valores atuais do estado
     current_un_med = st.session_state.get('un_med_select_key', "UN")
     current_qtde_compra = st.session_state.get('qtde_compra_key', 0.0)
 
-    # 2. Roda o cálculo automático
     calculated_qtde_custos = calculate_qtde_custos_auto(current_un_med, current_qtde_compra)
     
-    # 3. Lógica de Sincronização e Prevenção do Erro "cannot be modified"
+    # Lógica de Sincronização e Prevenção do Erro "cannot be modified"
     if st.session_state.current_page_action == "Cadastro":
         
-        # O Streamlit armazena o valor do widget em st.session_state.qtde_para_custos_final_key
         qtde_input_value = st.session_state.get('qtde_para_custos_final_key', 0.0)
         
-        # Verifica se o usuário alterou o input (o valor do widget é diferente do nosso valor de controle)
         user_changed_input = abs(qtde_input_value - st.session_state.qtde_para_custos_last_value) > 0.0001
-        # Verifica se a alteração na Quantidade/Unidade de Medida mudou o cálculo automático
         auto_calculation_changed = abs(calculated_qtde_custos - st.session_state.qtde_para_custos_last_value) > 0.0001
         
         if user_changed_input:
@@ -279,7 +280,9 @@ def run_page():
             st.session_state.qtde_para_custos_last_value = calculated_qtde_custos
             st.session_state["qtde_para_custos_value"] = calculated_qtde_custos
         
-        # Caso 3: Não houve alteração relevante (seja manual ou automática), mantém o valor em st.session_state["qtde_para_custos_value"]
+        # Se for a primeira execução/reset, a chave "qtde_para_custos_final_key" ainda não existe no
+        # dicionário do session_state, então usamos o valor de qtde_para_custos_value para o input.
+        # Caso contrário, o Streamlit usará o valor digitado/clicado (qtde_para_custos_final_key).
 
     # Variáveis de trabalho (Usadas para o cálculo de Pré-visualização e Persistência)
     qtde_compra_final = st.session_state.qtde_compra_key
@@ -422,11 +425,9 @@ def run_page():
         un_codes_list = unidades_df["codigo"].to_list()
         un_default_index_for_cad = 0
         try:
-             # Tenta encontrar o índice da unidade de medida do session_state
              un_default_index_for_cad = un_codes_list.index(st.session_state.un_med_select_key)
         except ValueError:
              try:
-                 # Tenta encontrar o índice de "UN"
                  un_default_index_for_cad = un_codes_list.index("UN")
              except ValueError:
                  un_default_index_for_cad = 0
@@ -480,7 +481,6 @@ def run_page():
                 value=st.session_state.qtde_para_custos_value, 
                 step=0.01,
                 key="qtde_para_custos_final_key"
-                # Sem on_change para evitar o erro de modificação
             )
             
             # Atualiza a variável de estado de suporte (qtde_para_custos_value) com o valor atual do input.
@@ -581,10 +581,12 @@ def run_page():
                 # 2. Salva ou atualiza a Tabela Mestra Ativa
                 salvar_insumo_ativo(df_compras)
 
-                # LIMPAR O FORMULÁRIO APÓS SALVAR
+                # CORREÇÃO: Limpa o formulário e força o rerurn para a aba de visualização
                 st.session_state.current_page_action = "Visualizar" 
-                st.session_state.acao_radio_key = "📋 Visualizar insumos (e Editar)" 
-                reset_session_state() # Reseta o estado APÓS o rerurn da mudança de aba
+                # NOTA: Não alteramos acao_radio_key aqui para evitar o erro "cannot be modified".
+                # A função reset_session_state() abaixo re-inicializa acao_radio_key para 'Cadastro'.
+                # O if/else abaixo do st.radio forçará o estado para 'Visualizar' no próximo re-run.
+                reset_session_state() 
                 
                 st.success(f"Insumo **{novo['insumo_resumo']}** salvo com sucesso! Indo para Relatório.")
                 st.rerun() 
