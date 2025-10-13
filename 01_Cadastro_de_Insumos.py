@@ -262,21 +262,24 @@ def run_page():
     # 3. Lógica de Sincronização e Prevenção do Erro "cannot be modified"
     if st.session_state.current_page_action == "Cadastro":
         
+        # O Streamlit armazena o valor do widget em st.session_state.qtde_para_custos_final_key
         qtde_input_value = st.session_state.get('qtde_para_custos_final_key', 0.0)
         
+        # Verifica se o usuário alterou o input (o valor do widget é diferente do nosso valor de controle)
         user_changed_input = abs(qtde_input_value - st.session_state.qtde_para_custos_last_value) > 0.0001
+        # Verifica se a alteração na Quantidade/Unidade de Medida mudou o cálculo automático
         auto_calculation_changed = abs(calculated_qtde_custos - st.session_state.qtde_para_custos_last_value) > 0.0001
         
         if user_changed_input:
-            # Usuário alterou o campo "Quantidade para custos" manualmente -> PRESERVA O VALOR DO USUÁRIO
+            # Caso 1: Usuário alterou o campo "Quantidade para custos" manualmente -> PRESERVA O VALOR DO USUÁRIO
             st.session_state.qtde_para_custos_last_value = qtde_input_value
             st.session_state["qtde_para_custos_value"] = qtde_input_value
         elif auto_calculation_changed:
-            # Mudança na Unidade/Quantidade Compra que afetou o cálculo -> APLICA O VALOR AUTOMÁTICO
+            # Caso 2: Mudança na Unidade/Quantidade Compra que afetou o cálculo -> APLICA O VALOR AUTOMÁTICO
             st.session_state.qtde_para_custos_last_value = calculated_qtde_custos
             st.session_state["qtde_para_custos_value"] = calculated_qtde_custos
         
-        # Caso contrário, mantém o valor anterior, que é o valor final correto.
+        # Caso 3: Não houve alteração relevante (seja manual ou automática), mantém o valor em st.session_state["qtde_para_custos_value"]
 
     # Variáveis de trabalho (Usadas para o cálculo de Pré-visualização e Persistência)
     qtde_compra_final = st.session_state.qtde_compra_key
@@ -306,6 +309,7 @@ def run_page():
     def set_page_action_and_reset(new_action):
         st.session_state.current_edit_insumo = None 
         if new_action == "Cadastro":
+             # O reset deve ocorrer no re-run da mudança de aba
              reset_session_state()
              st.session_state.current_page_action = "Cadastro"
         else:
@@ -418,11 +422,11 @@ def run_page():
         un_codes_list = unidades_df["codigo"].to_list()
         un_default_index_for_cad = 0
         try:
-             # Tenta encontrar o índice da unidade de medida do session_state, garantindo 0 como fallback
+             # Tenta encontrar o índice da unidade de medida do session_state
              un_default_index_for_cad = un_codes_list.index(st.session_state.un_med_select_key)
         except ValueError:
              try:
-                 # Tenta encontrar o índice de "UN" se o session_state estava corrompido
+                 # Tenta encontrar o índice de "UN"
                  un_default_index_for_cad = un_codes_list.index("UN")
              except ValueError:
                  un_default_index_for_cad = 0
@@ -480,7 +484,6 @@ def run_page():
             )
             
             # Atualiza a variável de estado de suporte (qtde_para_custos_value) com o valor atual do input.
-            # Se o usuário digitou, o Streamlit já atualizou qtde_para_custos_final_key, e agora atualizamos qtde_para_custos_value para persistir.
             if st.session_state["qtde_para_custos_value"] != st.session_state.qtde_para_custos_final_key:
                 st.session_state["qtde_para_custos_value"] = st.session_state.qtde_para_custos_final_key
                 # Atualiza o last_value para o próximo ciclo de detecção (IMPORTANTE)
