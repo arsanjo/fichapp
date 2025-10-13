@@ -1,5 +1,5 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM ESTRUTURA DE 2 ABAS, CORREÇÃO DE ÍNDICE E FLUXO DE CÁLCULO (V8.5)
+# CÓDIGO FINAL COM CORREÇÃO DE ERRO DE MODIFICAÇÃO DE WIDGET (V8.6 - Estabilidade Total)
 
 import streamlit as st
 import pandas as pd
@@ -155,10 +155,9 @@ def run_page():
     # =========================================================
     # Estado da UI & Funções de Edição/Reset
     # =========================================================
-    # CHAVE DE CONTROLE PARA AUTOMAÇÃO DO CÁLCULO
-    # Se esta chave for True, o cálculo automático NÃO deve sobrescrever o campo 'Quantidade para Custos'
-    if 'qtde_para_custos_manual_change' not in st.session_state:
-        st.session_state.qtde_para_custos_manual_change = False
+    # VARIÁVEL DE ESTADO PARA MONITORAR O ÚLTIMO VALOR (SIMPLIFICADA)
+    if 'qtde_para_custos_last_value' not in st.session_state:
+        st.session_state.qtde_para_custos_last_value = 0.0
 
     def reset_session_state():
         st.session_state["nome_resumo"] = ""
@@ -174,8 +173,8 @@ def run_page():
         st.session_state["qtde_para_custos_value"] = 0.0
         st.session_state.current_page_action = "Cadastro"
         st.session_state.acao_radio_key = "➕ Cadastrar novo insumo"
-        st.session_state.qtde_para_custos_manual_change = False # Reseta a chave de controle
-        st.session_state.un_med_select_key_label = "UN – Unidade" # Adicionado para evitar erro na inicialização
+        st.session_state.qtde_para_custos_last_value = 0.0
+        st.session_state.un_med_select_key_label = "UN – Unidade" 
 
     defaults = {
         "nome_resumo": "", "nome_completo": "", "nome_completo_lock": True,
@@ -185,7 +184,7 @@ def run_page():
         "un_med_select_key": "UN", "qtde_para_custos_value": 0.0,
         "current_page_action": "Cadastro",
         "acao_radio_key": "➕ Cadastrar novo insumo",
-        "qtde_para_custos_manual_change": False,
+        "qtde_para_custos_last_value": 0.0,
         "un_med_select_key_label": "UN – Unidade"
     }
     for k,v in defaults.items():
@@ -222,7 +221,7 @@ def run_page():
         st.session_state.current_edit_insumo = insumo_resumo
         st.session_state.current_page_action = "Edição" 
         st.session_state.acao_radio_key = "📋 Visualizar insumos (e Editar)"
-        st.session_state.qtde_para_custos_manual_change = False # Reseta para Edição
+        st.session_state.qtde_para_custos_last_value = float(ultima_compra["qtde_para_custos"]) # Atualiza o last value para edição
 
         st.rerun()
 
@@ -232,30 +231,16 @@ def run_page():
         st.session_state.edit_insumo_trigger = None 
         load_insumo_data(insumo_a_editar)
         
-    # Callback para detectar mudança manual no campo 'Quantidade para Custos'
-    def handle_qtde_custos_change():
-        if st.session_state.current_page_action == "Cadastro":
-            # Se o valor que o usuário colocou for diferente do valor calculado, marca como manual
-            calculated_value = calculate_qtde_custos_auto()
-            if abs(st.session_state.qtde_para_custos_final_key - calculated_value) > 0.0001:
-                st.session_state.qtde_para_custos_manual_change = True
-            else:
-                 st.session_state.qtde_para_custos_manual_change = False
-        # Para a edição, sempre permite a mudança
-
-    # Função que faz o cálculo automático
-    def calculate_qtde_custos_auto():
-         # Re-carrega o fator, pois ele pode ter mudado
+    # Função que faz o cálculo automático de qtde_para_custos
+    def calculate_qtde_custos_auto(un_med_code, qtde_compra):
         fator_por_codigo_calc = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"]))
-        fator = fator_por_codigo_calc.get(st.session_state.un_med_select_key, 1.0)
+        fator = fator_por_codigo_calc.get(un_med_code, 1.0)
         fator = 1.0 if (pd.isna(fator) or fator is None or fator<=0) else float(fator)
         
-        current_qtde_compra_val = st.session_state.get('qtde_compra_key', 0.0)
-        
-        if st.session_state.un_med_select_key in ["G", "ML", "DZ", "MIL", "CT", "PAR"]:
-            return current_qtde_compra_val * fator
+        if un_med_code in ["G", "ML", "DZ", "MIL", "CT", "PAR"]:
+            return qtde_compra * fator
         else:
-            return current_qtde_compra_val
+            return qtde_compra
 
     # =========================================================
     # INICIALIZAÇÃO E CÁLCULO (Executado em todo rerun)
@@ -272,17 +257,26 @@ def run_page():
     current_qtde_compra = st.session_state.get('qtde_compra_key', 0.0)
 
     # 2. Roda o cálculo automático
-    calculated_qtde_custos = calculate_qtde_custos_auto()
+    calculated_qtde_custos = calculate_qtde_custos_auto(current_un_med, current_qtde_compra)
     
     # 3. Lógica de Sincronização e Prevenção do Erro "cannot be modified"
-    # Apenas sincroniza a variável de estado que guarda o CUSTOS se o campo não foi alterado manualmente
     if st.session_state.current_page_action == "Cadastro":
-        if not st.session_state.qtde_para_custos_manual_change:
-            st.session_state["qtde_para_custos_value"] = float(calculated_qtde_custos)
         
-        # Sincroniza o valor de volta para a chave do input
-        st.session_state.qtde_para_custos_final_key = st.session_state["qtde_para_custos_value"]
-
+        qtde_input_value = st.session_state.get('qtde_para_custos_final_key', 0.0)
+        
+        user_changed_input = abs(qtde_input_value - st.session_state.qtde_para_custos_last_value) > 0.0001
+        auto_calculation_changed = abs(calculated_qtde_custos - st.session_state.qtde_para_custos_last_value) > 0.0001
+        
+        if user_changed_input:
+            # Usuário alterou o campo "Quantidade para custos" manualmente -> PRESERVA O VALOR DO USUÁRIO
+            st.session_state.qtde_para_custos_last_value = qtde_input_value
+            st.session_state["qtde_para_custos_value"] = qtde_input_value
+        elif auto_calculation_changed:
+            # Mudança na Unidade/Quantidade Compra que afetou o cálculo -> APLICA O VALOR AUTOMÁTICO
+            st.session_state.qtde_para_custos_last_value = calculated_qtde_custos
+            st.session_state["qtde_para_custos_value"] = calculated_qtde_custos
+        
+        # Caso contrário, mantém o valor anterior, que é o valor final correto.
 
     # Variáveis de trabalho (Usadas para o cálculo de Pré-visualização e Persistência)
     qtde_compra_final = st.session_state.qtde_compra_key
@@ -307,23 +301,17 @@ def run_page():
     
     # --- RADIO BUTTON (Estrutura de 2 Abas) ---
     
-    # Determina o índice ativo
     index_acao = 0 if st.session_state.current_page_action in ["Cadastro", "Edição"] else 1
     
-    # Handler para o reset e troca de aba (Simplificado, usando o callback)
     def set_page_action_and_reset(new_action):
-        st.session_state.acao_manual_change = True
         st.session_state.current_edit_insumo = None 
-        if new_action != st.session_state.current_page_action:
-             # Este if garante que o reset só ocorre quando a ABA MUDA, e não no clique dentro da mesma ABA
-            if new_action == "Visualizar":
-                st.session_state.current_page_action = "Visualizar"
-            elif new_action == "Cadastro":
-                 reset_session_state()
-                 st.session_state.current_page_action = "Cadastro"
-            st.rerun()
+        if new_action == "Cadastro":
+             reset_session_state()
+             st.session_state.current_page_action = "Cadastro"
+        else:
+            st.session_state.current_page_action = "Visualizar"
+        st.rerun()
 
-    # Callback para o Radio Button
     def handle_radio_change():
         if st.session_state.acao_radio_key == "➕ Cadastrar novo insumo":
             set_page_action_and_reset("Cadastro")
@@ -344,7 +332,6 @@ def run_page():
         edit_data = st.session_state.current_edit_data
         st.subheader(f"✏️ Editando: {edit_data.get('insumo_resumo', 'Insumo')}")
         
-        # --- INPUTS INTERATIVOS NA EDIÇÃO (Fora do Form) ---
         col_compra_data, col_compra_qtde = st.columns(2)
         
         # Encontra o índice correto do selectbox
@@ -413,7 +400,6 @@ def run_page():
             editado = st.form_submit_button("✅ Salvar Compra Corrigida/Atualizada")
 
             if editado:
-                # Lógica de salvar como NOVA COMPRA (com data de hoje)
                 st.info("A lógica de salvamento da edição (que gera uma nova compra no histórico) será implementada na próxima fase. A edição está funcionando visualmente!")
                 st.rerun()
 
@@ -462,8 +448,6 @@ def run_page():
             # Sincroniza o estado. Se a unidade mudou, força um re-run.
             if st.session_state.un_med_select_key != un_med_current:
                  st.session_state.un_med_select_key = un_med_current
-                 # Quando a unidade muda, o cálculo automático deve ter prioridade
-                 st.session_state.qtde_para_custos_manual_change = False 
                  st.rerun() 
             
             quantidade_compra = st.number_input(
@@ -484,16 +468,23 @@ def run_page():
             valor_total_compra_input = st.number_input("Valor total da compra (R$)", min_value=0.0, value=st.session_state.valor_total_compra_key, step=0.01, key="valor_total_compra_key")
             valor_frete_input = st.number_input("Frete (R$)", min_value=0.0, value=st.session_state.valor_frete_key, step=0.01, key="valor_frete_key")
             
-            # Quantidade para Custos (Com Callback e Controle de Automação)
+            # Quantidade para Custos (USANDO O VALOR DO STATE QUE FOI CALCULADO/PRESERVADO)
             qtde_para_custos = st.number_input(
                 "Quantidade para custos",
                 min_value=0.0,
-                # Usa o valor automático SE não houver alteração manual
+                # Usa o valor que foi calculado ou preservado na lógica acima
                 value=st.session_state.qtde_para_custos_value, 
                 step=0.01,
-                key="qtde_para_custos_final_key",
-                on_change=handle_qtde_custos_change 
+                key="qtde_para_custos_final_key"
+                # Sem on_change para evitar o erro de modificação
             )
+            
+            # Atualiza a variável de estado de suporte (qtde_para_custos_value) com o valor atual do input.
+            # Se o usuário digitou, o Streamlit já atualizou qtde_para_custos_final_key, e agora atualizamos qtde_para_custos_value para persistir.
+            if st.session_state["qtde_para_custos_value"] != st.session_state.qtde_para_custos_final_key:
+                st.session_state["qtde_para_custos_value"] = st.session_state.qtde_para_custos_final_key
+                # Atualiza o last_value para o próximo ciclo de detecção (IMPORTANTE)
+                st.session_state.qtde_para_custos_last_value = st.session_state.qtde_para_custos_final_key
             
             percentual_perda_input = st.number_input("% de perda", min_value=0.0, max_value=100.0, value=st.session_state.percentual_perda_key, step=0.5, key="percentual_perda_key")
             
