@@ -1,5 +1,5 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM CORREÇÃO DE AVISO "no-op" (V8.9 - Estabilidade Máxima)
+# CÓDIGO FINAL COM CORREÇÃO DEFINITIVA DO ERRO DE ESCOPO (V8.9)
 
 import streamlit as st
 import pandas as pd
@@ -18,9 +18,6 @@ def run_page():
 
     DARK_CSS = """
     <style>
-    /* ATENÇÃO: Esta é uma mensagem de aviso temporária para garantir a estabilidade */
-    .stAlert { margin-bottom: 24px; padding: 12px; border-radius: 8px; border: 1px solid #ffcc00; background-color: #fff3cd; color: #856404; font-weight: bold; }
-    
     .block-container { padding-top: 2rem; padding-bottom: 2rem; }
     h1, h2, h3, h4 { font-weight: 700; }
     .st-expander { border: 1px solid #e5e7eb; border-radius: 10px; }
@@ -42,11 +39,6 @@ def run_page():
     </style>
     """
     st.markdown(DARK_CSS, unsafe_allow_html=True)
-    
-    # MENSAGEM DE AVISO CONFORME SOLICITADO
-    # REMOVIDA para não ser exibida, mantendo o foco na correção do erro de código.
-    # Se quiser reativar a mensagem, descomente a linha abaixo.
-    # st.markdown('<div class="stAlert">ATENÇÃO - CUIDADO PARA NÃO MEXER NO QUE JÁ ESTÁ CERTO</div>', unsafe_allow_html=True)
 
     # =========================================================
     # Paths e Inicialização de Arquivos (Mantido)
@@ -206,6 +198,10 @@ def run_page():
 
     def load_insumo_data(insumo_resumo):
         df_compras = carregar_tabela(COMPRAS_CSV)
+        # FIX: A variável unidades_df é acessada aqui, mas é definida abaixo no escopo de run_page.
+        # Para evitar o erro de escopo, vou carregá-la localmente.
+        unidades_df = lista_unidades() 
+        
         try:
              ultima_compra = df_compras[df_compras['insumo_resumo'] == insumo_resumo].sort_values(by='atualizado_em', ascending=False).iloc[0]
         except IndexError:
@@ -238,16 +234,12 @@ def run_page():
         st.session_state["qtde_para_custos_final_key"] = float(ultima_compra["qtde_para_custos"])
 
         st.rerun()
-
-    # Callback para o botão de Edição na tabela
-    if 'edit_insumo_trigger' in st.session_state and st.session_state.edit_insumo_trigger:
-        insumo_a_editar = st.session_state.edit_insumo_trigger
-        st.session_state.edit_insumo_trigger = None 
-        load_insumo_data(insumo_a_editar)
         
     # Função que faz o cálculo automático de qtde_para_custos
     def calculate_qtde_custos_auto(un_med_code, qtde_compra):
-        fator_por_codigo_calc = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"]))
+        # AQUI usamos lista_unidades() para garantir que a função seja self-contained
+        unidades_df_calc = lista_unidades() 
+        fator_por_codigo_calc = dict(zip(unidades_df_calc["codigo"], unidades_df_calc["qtde_padrao"]))
         fator = fator_por_codigo_calc.get(un_med_code, 1.0)
         fator = 1.0 if (pd.isna(fator) or fator is None or fator<=0) else float(fator)
         
@@ -258,14 +250,22 @@ def run_page():
 
     # =========================================================
     # INICIALIZAÇÃO E CÁLCULO (Executado em todo rerun)
+    # FIX V8.9: MOVEMOS ESTE BLOCO PARA O INÍCIO DA EXECUÇÃO
     # =========================================================
     
     grupos = lista_grupos()
-    unidades_df = lista_unidades()
+    unidades_df = lista_unidades() 
     unidades_labels = unidades_df.apply(label_unidade, axis=1).tolist()
     codigo_por_label = dict(zip(unidades_labels, unidades_df["codigo"]))
     fator_por_codigo = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"])) 
     
+    # Callback para o botão de Edição na tabela
+    if 'edit_insumo_trigger' in st.session_state and st.session_state.edit_insumo_trigger:
+        insumo_a_editar = st.session_state.edit_insumo_trigger
+        st.session_state.edit_insumo_trigger = None 
+        load_insumo_data(insumo_a_editar)
+        
+    # --- Lógica de Sincronização de Estado de Input ---
     current_un_med = st.session_state.get('un_med_select_key', "UN")
     current_qtde_compra = st.session_state.get('qtde_compra_key', 0.0)
 
@@ -321,15 +321,13 @@ def run_page():
              st.session_state.current_page_action = "Cadastro"
         else:
             st.session_state.current_page_action = "Visualizar"
-        # Não usamos st.rerun() dentro do callback, apenas re-definimos o estado da próxima execução
-        # st.rerun()
+        # Não usamos st.rerun() dentro do callback, o Streamlit lida com o re-run
 
     def handle_radio_change():
         if st.session_state.acao_radio_key == "➕ Cadastrar novo insumo":
             set_page_action_and_reset("Cadastro")
         elif st.session_state.acao_radio_key == "📋 Visualizar insumos (e Editar)":
             set_page_action_and_reset("Visualizar")
-        # O re-run é feito automaticamente pelo Streamlit após a execução do callback.
 
     acao = st.radio("Ação:", ["➕ Cadastrar novo insumo", "📋 Visualizar insumos (e Editar)"], 
                     index=index_acao,
@@ -448,7 +446,6 @@ def run_page():
             data_compra = st.date_input("Data da compra", value=date.today(), format="DD/MM/YYYY")
             
             # --- CORREÇÃO DO WARNING "no-op" ---
-            # Removemos o st.rerun() do bloco de sincronização
             un_label_sel = st.selectbox(
                 "Unidade de medida", options=unidades_labels,
                 index=un_default_index_for_cad,
@@ -458,11 +455,9 @@ def run_page():
             # Mapeia a label selecionada de volta para o código (UN, KG, DZ...)
             un_med_current = codigo_por_label.get(un_label_sel, "UN")
             
-            # Sincroniza o estado. Se a unidade mudou, o próximo rerun (que é garantido pelo Streamlit)
-            # pegará o novo valor, e a lógica de cálculo acima será acionada.
+            # Sincroniza o estado.
             if st.session_state.un_med_select_key != un_med_current:
                  st.session_state.un_med_select_key = un_med_current
-                 # st.rerun() - REMOVIDO para evitar o aviso "no-op"
             
             quantidade_compra = st.number_input(
                 "Quantidade comprada", 
@@ -598,7 +593,6 @@ def run_page():
                 # A redefinição de estado deve vir APÓS o rerun para que seja aplicada no próximo ciclo
                 reset_session_state()
                 
-                # NOTA: O st.rerun() deve ser o ÚLTIMO comando no bloco if
                 st.rerun() 
                 
 
