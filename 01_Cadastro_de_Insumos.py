@@ -1,5 +1,5 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM CORREÇÃO DEFINITIVA DO ERRO DE ESCOPO (V8.9)
+# CÓDIGO FINAL COM CORREÇÃO DEFINITIVA DO ERRO DE MODIFICAÇÃO DE WIDGET (V8.10)
 
 import streamlit as st
 import pandas as pd
@@ -179,6 +179,13 @@ def run_page():
         # Re-inicializa a chave de input para forçar o reset do widget
         st.session_state["qtde_para_custos_final_key"] = 0.0 
 
+    # NOVO: Callback para limpar os campos após salvar (evita o erro no próximo rerun)
+    def post_save_reset():
+        # Apenas chamamos o reset no próximo ciclo de execução, após o rerun
+        reset_session_state()
+        st.session_state.current_page_action = "Visualizar"
+        st.session_state.acao_radio_key = "📋 Visualizar insumos (e Editar)"
+        # O st.rerun() é chamado logo após a função de persistência.
 
     defaults = {
         "nome_resumo": "", "nome_completo": "", "nome_completo_lock": True,
@@ -198,9 +205,8 @@ def run_page():
 
     def load_insumo_data(insumo_resumo):
         df_compras = carregar_tabela(COMPRAS_CSV)
-        # FIX: A variável unidades_df é acessada aqui, mas é definida abaixo no escopo de run_page.
-        # Para evitar o erro de escopo, vou carregá-la localmente.
-        unidades_df = lista_unidades() 
+        # FIX V8.9: A variável unidades_df é carregada localmente para resolver o erro de escopo
+        unidades_df_local = lista_unidades() 
         
         try:
              ultima_compra = df_compras[df_compras['insumo_resumo'] == insumo_resumo].sort_values(by='atualizado_em', ascending=False).iloc[0]
@@ -221,7 +227,7 @@ def run_page():
         st.session_state["qtde_para_custos_value"] = float(ultima_compra["qtde_para_custos"]) 
         # Tenta popular a chave de label para o selectbox
         try:
-             unid_row = unidades_df[unidades_df['codigo'] == ultima_compra["un_med"]].iloc[0]
+             unid_row = unidades_df_local[unidades_df_local['codigo'] == ultima_compra["un_med"]].iloc[0]
              st.session_state.un_med_select_key_label = label_unidade(unid_row)
         except IndexError:
              st.session_state.un_med_select_key_label = "UN – Unidade"
@@ -237,7 +243,6 @@ def run_page():
         
     # Função que faz o cálculo automático de qtde_para_custos
     def calculate_qtde_custos_auto(un_med_code, qtde_compra):
-        # AQUI usamos lista_unidades() para garantir que a função seja self-contained
         unidades_df_calc = lista_unidades() 
         fator_por_codigo_calc = dict(zip(unidades_df_calc["codigo"], unidades_df_calc["qtde_padrao"]))
         fator = fator_por_codigo_calc.get(un_med_code, 1.0)
@@ -250,14 +255,13 @@ def run_page():
 
     # =========================================================
     # INICIALIZAÇÃO E CÁLCULO (Executado em todo rerun)
-    # FIX V8.9: MOVEMOS ESTE BLOCO PARA O INÍCIO DA EXECUÇÃO
     # =========================================================
     
     grupos = lista_grupos()
     unidades_df = lista_unidades() 
     unidades_labels = unidades_df.apply(label_unidade, axis=1).tolist()
     codigo_por_label = dict(zip(unidades_labels, unidades_df["codigo"]))
-    fator_por_codigo = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"])) 
+    fator_por_codigo = dict(zip(unidades_labels, unidades_df["qtde_padrao"])) 
     
     # Callback para o botão de Edição na tabela
     if 'edit_insumo_trigger' in st.session_state and st.session_state.edit_insumo_trigger:
@@ -557,13 +561,17 @@ def run_page():
                 representante = st.text_input("Representante", key="representante_input_cad")
                 observacao = st.text_area("Observação", key="observacao_input_cad")
 
-            enviado = st.form_submit_button("💾 Salvar Insumo")
+            # NOVO: USANDO CALLBACK para forçar o reset no próximo rerun.
+            enviado = st.form_submit_button("💾 Salvar Insumo", on_click=post_save_reset)
 
-        # Persistência
+        # Persistência - Ocorre antes do post_save_reset (que é um callback) ser executado no final do ciclo.
         if 'enviado' in locals() and enviado:
             
             if not st.session_state["nome_resumo"].strip() or qtde_compra_final <= 0 or valor_total_compra_input <= 0:
                  st.error("Campos obrigatórios: Nome Resumido, Quantidade Comprada e Valor Total.")
+                 # Se houver erro, cancelamos o reset (o callback não será executado) e mantemos o rerun
+                 st.session_state.current_page_action = "Cadastro"
+                 st.stop() # Finaliza a execução para evitar comandos desnecessários.
             else:
                 # 1. Salva a compra histórica
                 df_compras = carregar_tabela(COMPRAS_CSV)
@@ -585,14 +593,9 @@ def run_page():
                 # 2. Salva ou atualiza a Tabela Mestra Ativa
                 salvar_insumo_ativo(df_compras)
 
-                # FORÇA O RE-RUN PARA MUDAR PARA A TELA DE VISUALIZAÇÃO
-                st.session_state.current_page_action = "Visualizar" 
-                
                 st.success(f"Insumo **{novo['insumo_resumo']}** salvo com sucesso! Indo para Relatório.")
                 
-                # A redefinição de estado deve vir APÓS o rerun para que seja aplicada no próximo ciclo
-                reset_session_state()
-                
+                # O callback 'post_save_reset' será executado APÓS esta linha (antes do próximo rerun)
                 st.rerun() 
                 
 
