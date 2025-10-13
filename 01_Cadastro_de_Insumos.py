@@ -1,5 +1,5 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM CORREÇÃO DE ERRO DE CALLBACK E LÓGICA DE CÁLCULO MANTIDA (V6.0)
+# CÓDIGO FINAL COM CORREÇÃO ESTRUTURAL E FLUXO DE 2 ABAS (V8.0)
 
 import streamlit as st
 import pandas as pd
@@ -13,7 +13,7 @@ from utils.nav import sidebar_menu
 def run_page():
 
     # =========================================================
-    # CONFIG / THEME
+    # CONFIG / THEME (Mantido)
     # =========================================================
     st.set_page_config(page_title="FichApp — Cadastro de Insumos", page_icon="📦", layout="centered")
 
@@ -28,6 +28,9 @@ def run_page():
     .stButton>button:hover, .stForm form button[kind="primary"]{
       background: #1e293b;
     }
+    /* Estilo para o botão de edição na tabela */
+    .edit-button-style { background-color: #f7a81b; color: #000; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+
     #fichapp-footer {
       margin-top: 24px; padding: 16px 18px; border-radius: 12px;
       background: #0b1220; color: #e5e7eb; font-size: 0.92rem;
@@ -39,7 +42,9 @@ def run_page():
     """
     st.markdown(DARK_CSS, unsafe_allow_html=True)
 
-    # ... (Seções de Versão, Caminhos dos Dados e Inicialização mantidas) ...
+    # =========================================================
+    # Paths e Inicialização (Mantido)
+    # =========================================================
     VERSAO_PATH = "version.json"
     versao_info = {"version": "0.0.0", "released_at": "", "description": ""}
     if os.path.exists(VERSAO_PATH):
@@ -131,7 +136,6 @@ def run_page():
             return
 
         df_compras["data_compra_obj"] = pd.to_datetime(df_compras["data_compra"], format="%d/%m/%Y", errors='coerce')
-        
         idx = df_compras.dropna(subset=["data_compra_obj"]).groupby(["insumo_resumo"])["data_compra_obj"].idxmax()
         
         if idx.empty:
@@ -150,33 +154,36 @@ def run_page():
         
         salvar_tabela(df_ativo, INSUMOS_ATIVOS_CSV)
 
-
     # =========================================================
-    # Estado da UI (Melhorado)
+    # Estado da UI & Funções de Edição/Reset
     # =========================================================
     def reset_session_state():
         st.session_state["nome_resumo"] = ""
         st.session_state["nome_completo"] = ""
         st.session_state["nome_completo_lock"] = True
-        st.session_state["un_sel"] = "UN"
-        st.session_state["last_un_sel"] = None
-        st.session_state["last_qtd_compra"] = None
-        st.session_state["qtde_para_custos_value"] = 0.0
         st.session_state.current_edit_insumo = None
         st.session_state.current_edit_data = {}
+        # Reseta os inputs que ficaram fora do form
+        st.session_state.qtde_compra_key = 0.0
+        st.session_state.valor_total_compra_key = 0.0
+        st.session_state.valor_frete_key = 0.0
+        st.session_state.percentual_perda_key = 0.0
+        st.session_state.un_med_select_key = "UN"
+        st.session_state["qtde_para_custos_value"] = 0.0
 
     defaults = {
         "nome_resumo": "", "nome_completo": "", "nome_completo_lock": True,
-        "un_sel": "UN", "last_un_sel": None, "last_qtd_compra": None,
-        "qtde_para_custos_value": 0.0,
-        "current_edit_insumo": None,
-        "current_edit_data": {},
-        "acao_manual_change": False,
+        "current_edit_insumo": None, "current_edit_data": {}, 
+        "acao_manual_change": False, # Controla se o usuário clicou no rádio button
+        # Default para as chaves movidas para fora do form
+        "qtde_compra_key": 0.0, "valor_total_compra_key": 0.0, "valor_frete_key": 0.0, "percentual_perda_key": 0.0,
+        "un_med_select_key": "UN", "qtde_para_custos_value": 0.0,
+        "current_page_action": "Cadastro" # Controla o estado principal (Cadastro vs Visualizar/Edição)
     }
     for k,v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
-            
+
     def load_insumo_data(insumo_resumo):
         df_compras = carregar_tabela(COMPRAS_CSV)
         # Pega a última compra do insumo
@@ -185,115 +192,242 @@ def run_page():
         # Preenche os campos do st.session_state para refletir no formulário
         st.session_state["nome_resumo"] = ultima_compra["insumo_resumo"]
         st.session_state["nome_completo"] = ultima_compra["insumo_completo"]
-        st.session_state["nome_completo_lock"] = (ultima_compra["insumo_completo"] == ultima_compra["insumo_resumo"])
-        st.session_state["un_sel"] = ultima_compra["un_med"]
-        st.session_state["qtde_para_custos_value"] = ultima_compra["qtde_para_custos"]
+        st.session_state.qtde_compra_key = float(ultima_compra["quantidade_compra"])
+        st.session_state.valor_total_compra_key = float(ultima_compra["valor_total_compra"])
+        st.session_state.valor_frete_key = float(ultima_compra["valor_frete"])
+        st.session_state.percentual_perda_key = float(ultima_compra["percentual_perda"])
+        st.session_state.un_med_select_key = ultima_compra["un_med"]
+        st.session_state["qtde_para_custos_value"] = float(ultima_compra["qtde_para_custos"]) # O valor já calculado
         
         st.session_state["current_edit_data"] = ultima_compra.to_dict()
         st.session_state.current_edit_insumo = insumo_resumo
+        st.session_state.current_page_action = "Edição" # Altera para o modo de edição
         
-        st.session_state["last_un_sel"] = ultima_compra["un_med"]
-        st.session_state["last_qtd_compra"] = ultima_compra["quantidade_compra"]
         st.rerun()
+
+    # Callback para o botão de Edição na tabela
+    if 'edit_insumo_trigger' in st.session_state and st.session_state.edit_insumo_trigger:
+        insumo_a_editar = st.session_state.edit_insumo_trigger
+        st.session_state.edit_insumo_trigger = None # Reseta o gatilho
+        load_insumo_data(insumo_a_editar)
 
 
     # =========================================================
-    # Cabeçalho
+    # CÁLCULO AUTOMÁTICO DE QTDE PARA CUSTOS
+    # =========================================================
+    
+    current_un_med = st.session_state.get('un_med_select_key', "UN")
+    current_qtde_compra = st.session_state.get('qtde_compra_key', 0.0)
+
+    fator = fator_por_codigo.get(current_un_med, 1.0)
+    fator = 1.0 if (pd.isna(fator) or fator is None or fator<=0) else float(fator)
+
+    if current_un_med in ["G", "ML", "DZ", "MIL", "CT", "PAR"]:
+        calculated_qtde_custos = current_qtde_compra * fator
+    else:
+        calculated_qtde_custos = current_qtde_compra
+    
+    # 2. Se o cálculo mudou E não for edição (onde o valor é fixo), atualiza o state
+    if st.session_state.current_page_action == "Cadastro":
+        if st.session_state["qtde_para_custos_value"] != float(calculated_qtde_custos):
+            st.session_state["qtde_para_custos_value"] = float(calculated_qtde_custos)
+            # Rerun é necessário aqui para atualizar o campo de input
+            # Este RERUN está implicito pelo st.session_state update no topo do script
+
+    # Garante que as variáveis de cálculo tenham os valores mais recentes
+    qtde_compra_final = st.session_state.qtde_compra_key
+    qtde_custos_final = st.session_state["qtde_para_custos_value"]
+    valor_total_compra = st.session_state.valor_total_compra_key
+    valor_frete = st.session_state.valor_frete_key
+    percentual_perda = st.session_state.percentual_perda_key
+    un_med_final = st.session_state.un_med_select_key
+    
+    # =========================================================
+    # Cabeçalho da Página
     # =========================================================
     st.markdown("<h1>📦 Cadastro de Insumos</h1>", unsafe_allow_html=True)
     
-    if st.session_state.current_edit_insumo and not st.session_state.get('acao_manual_change'):
-        index_acao = 1
-    elif st.session_state.get('acao_manual_change'):
-        index_acao = 0 if st.session_state.acao_radio == "➕ Cadastrar novo insumo" else 1 if st.session_state.acao_radio == "✏️ Editar insumo" else 2
-    else:
-        index_acao = 0
-
-    def reset_acao_and_state():
-        st.session_state.acao_manual_change = True
-        st.session_state.current_edit_insumo = None
-        reset_session_state()
-
-    acao = st.radio("Ação:", ["➕ Cadastrar novo insumo", "✏️ Editar insumo", "📋 Visualizar insumos"], 
-                    index=index_acao, 
-                    key="acao_radio", 
+    # --- NOVO RADIO BUTTON DE 2 OPÇÕES ---
+    acao = st.radio("Ação:", ["➕ Cadastrar novo insumo", "📋 Visualizar insumos (e Editar)"], 
+                    index=0 if st.session_state.current_page_action in ["Cadastro", "Edição"] else 1,
+                    key="acao_radio",
                     on_change=reset_acao_and_state)
-    
-    if acao != "✏️ Editar insumo" and st.session_state.current_edit_insumo:
+
+    if acao == "➕ Cadastrar novo insumo" and st.session_state.current_page_action != "Cadastro":
+        st.session_state.current_page_action = "Cadastro"
         reset_session_state()
-        st.session_state.acao_manual_change = False
+        st.rerun()
+    elif acao == "📋 Visualizar insumos (e Editar)" and st.session_state.current_page_action not in ["Visualizar", "Edição"]:
+        st.session_state.current_page_action = "Visualizar"
+        st.session_state.current_edit_insumo = None # Limpa qualquer edição pendente
+        reset_session_state()
         st.rerun()
 
+    
     # =========================================================
-    # CADASTRO (Lógica de Automação de Quantidade)
+    # MODO EDIÇÃO (Formulário Carregado)
     # =========================================================
-    if acao == "➕ Cadastrar novo insumo":
+    if st.session_state.current_page_action == "Edição":
         
-        if st.session_state.current_edit_insumo:
-             reset_session_state()
-             st.rerun()
-             
-        grupos = lista_grupos()
-        unidades_df = lista_unidades()
+        edit_data = st.session_state.current_edit_data
+        st.subheader(f"✏️ Editando: {edit_data.get('insumo_resumo', 'Insumo')}")
+        
+        # --- INPUTS INTERATIVOS NA EDIÇÃO (Fora do Form) ---
+        col_compra_data, col_compra_qtde = st.columns(2)
+        
+        # Valores para preencher os select boxes na Edição
         unidades_labels = unidades_df.apply(label_unidade, axis=1).tolist()
-        codigo_por_label = dict(zip(unidades_labels, unidades_df["codigo"]))
-        fator_por_codigo = dict(zip(unidades_df["codigo"], unidades_df["qtde_padrao"]))
+        grupos = lista_grupos()
+        
+        grupo_index = grupos.index(edit_data.get("grupo")) if edit_data.get("grupo") in grupos else 0
+        un_label_sel = f"{edit_data.get('un_med')} – {unidades_df[unidades_df['codigo'] == edit_data.get('un_med')].iloc[0]['descricao']}" if edit_data.get("un_med") in unidades_df['codigo'].values and not unidades_df[unidades_df['codigo'] == edit_data.get('un_med')].empty else unidades_labels[0]
+        un_label_index = unidades_labels.index(un_label_sel) if un_label_sel in unidades_labels else 0
+        data_compra_val = pd.to_datetime(edit_data.get("data_compra"), format="%d/%m/%Y", errors='coerce').date() if edit_data.get("data_compra") else date.today()
 
-        # === NOVO BLOCO: CALCULA QTDE PARA CUSTOS E FAZ O RERUN NECESSÁRIO ===
-        if st.session_state.last_qtd_compra != st.session_state.get('quantidade_compra_input_cad_temp', 0.0) or \
-           st.session_state.last_un_sel != st.session_state.get('un_med_calculated_temp', st.session_state.un_sel):
+        with col_compra_data:
+            st.date_input("Data da compra (Última Compra)", value=data_compra_val, format="DD/MM/YYYY", key="edit_data_compra")
+            st.selectbox("Unidade de medida", options=unidades_labels, index=un_label_index, key="edit_un_label_sel")
+            st.number_input("Quantidade comprada", min_value=0.0, value=qtde_compra_final, step=0.01, key="edit_quantidade_compra")
+            st.selectbox("Grupo", options=grupos, index=grupo_index, key="edit_grupo")
             
-            # Pega os valores temporários do input
-            un_med_temp = st.session_state.get('un_med_calculated_temp', st.session_state.un_sel)
-            quantidade_compra_temp = st.session_state.get('quantidade_compra_input_cad_temp', 0.0)
+        with col_compra_qtde:
+            st.number_input("Valor total da compra (R$)", min_value=0.0, value=valor_total_compra, step=0.01, key="edit_valor_total_compra")
+            st.number_input("Frete (R$)", min_value=0.0, value=valor_frete, step=0.01, key="edit_valor_frete")
+            st.number_input("Quantidade para custos", min_value=0.0, value=qtde_custos_final, step=0.01, key="edit_qtde_para_custos")
+            st.number_input("% de perda", min_value=0.0, max_value=100.0, value=percentual_perda, step=0.5, key="edit_percentual_perda")
             
-            fator = fator_por_codigo.get(un_med_temp, 1.0)
-            fator = 1.0 if (pd.isna(fator) or fator is None or fator<=0) else float(fator)
+        st.markdown("---")
+        
+        # --- PRÉ-VISUALIZAÇÃO (Recalcula com os inputs de Edição) ---
+        edit_valor_unit_bruto = (st.session_state.edit_valor_total_compra / st.session_state.edit_quantidade_compra) if st.session_state.edit_quantidade_compra > 0 else 0.0
+        edit_custo_total_com_frete = st.session_state.edit_valor_total_compra + st.session_state.edit_valor_frete
+        edit_qtde_para_custos_ajustada_perda = st.session_state.edit_qtde_para_custos * (1 - st.session_state.edit_percentual_perda/100.0)
+        edit_valor_unit_para_custos = (edit_custo_total_com_frete / edit_qtde_para_custos_ajustada_perda) if edit_qtde_para_custos_ajustada_perda > 0 else 0.0
+        
+        st.markdown("### 💰 Pré-visualização dos cálculos")
+        left, right = st.columns(2)
+        with left:
+            st.write(f"**Custo total c/ frete (Atual):** R$ {edit_custo_total_com_frete:.2f}")
+        with right:
+            st.write(f"**Novo Custo Unitário p/ Custos (UNID. BASE):** R$ {edit_valor_unit_para_custos:.6f}")
 
-            if un_med_temp in ["G", "ML", "DZ", "MIL", "CT", "PAR"]:
-                calculado = quantidade_compra_temp * fator
-            else:
-                calculado = quantidade_compra_temp 
 
-            # Atualiza o estado e força o rerun
-            st.session_state["qtde_para_custos_value"] = float(calculado)
-            st.session_state["last_un_sel"] = un_med_temp
-            st.session_state["last_qtd_compra"] = quantidade_compra_temp
+        # --- FORMULÁRIO DE EDIÇÃO (Dados não interativos) ---
+        with st.form("edicao_insumo_form", clear_on_submit=False):
+            c1, c2 = st.columns(2)
             
-            # Se for um valor diferente do que já estava no campo, faz o rerun
-            if st.session_state.get('qtde_para_custos_input_cad') != st.session_state["qtde_para_custos_value"]:
-                 st.rerun()
-        # =========================================================================
+            with c1:
+                st.text_input("Nome resumido do insumo", value=st.session_state["nome_resumo"], key="edit_nome_resumo")
+                st.text_input("Nome completo do insumo", value=st.session_state["nome_completo"], key="edit_nome_completo")
+                st.text_input("Marca (opcional)", value=edit_data.get("marca"), key="edit_marca")
+                st.selectbox("Tipo", ["Comprado", "Produzido no restaurante"], index=["Comprado", "Produzido no restaurante"].index(edit_data.get("tipo")) if edit_data.get("tipo") in ["Comprado", "Produzido no restaurante"] else 0, key="edit_tipo")
 
+            with c2:
+                st.text_input("Fornecedor", value=edit_data.get("fornecedor"), key="edit_fornecedor")
+                st.text_input("Fone do fornecedor", value=edit_data.get("fone_fornecedor"), key="edit_fone_fornecedor")
+                st.text_input("Documento / Nota Fiscal", value=edit_data.get("documento"), key="edit_documento")
+                st.text_input("Representante", value=edit_data.get("representante"), key="edit_representante")
+
+            observacao = st.text_area("Observação", value=edit_data.get("observacao"), key="edit_observacao")
+            
+            editado = st.form_submit_button("✅ Salvar Compra Corrigida/Atualizada")
+
+            if editado:
+                st.error("ERRO: A lógica de salvamento da edição ainda não está implementada. Volte em breve!")
+                st.rerun()
+
+
+    # =========================================================
+    # MODO CADASTRO
+    # =========================================================
+    elif st.session_state.current_page_action == "Cadastro":
+        
+        st.subheader("1. Dados Essenciais de Compra")
+        
+        # --- BLOCO DE INPUTS INTERATIVOS (FORA DO FORM) ---
+        col_compra_data, col_compra_qtde = st.columns(2)
+        
+        with col_compra_data:
+            data_compra = st.date_input("Data da compra", value=date.today(), format="DD/MM/YYYY")
+            
+            un_label_sel = st.selectbox(
+                "Unidade de medida", options=unidades_labels,
+                index=unidades_df.index[unidades_df["codigo"]==st.session_state.un_med_select_key].tolist()[0]
+                    if st.session_state.un_med_select_key in unidades_df["codigo"].values else 0,
+                key="un_med_select_key" 
+            )
+            un_med_current = codigo_por_label[un_label_sel]
+            
+            # Sincroniza o estado. Quando o valor for diferente, o código de cálculo acima rodará
+            if st.session_state.un_med_select_key != un_med_current:
+                 st.session_state.un_med_select_key = un_med_current
+                 st.rerun() 
+            
+            quantidade_compra = st.number_input(
+                "Quantidade comprada", min_value=0.0, value=st.session_state.qtde_compra_key, step=0.01, key="qtde_compra_key"
+            )
+            
+            grupo = st.selectbox(
+                "Grupo", options=grupos,
+                index=grupos.index(st.session_state.get('grupo_input_cad', grupos[0])) if st.session_state.get('grupo_input_cad') in grupos else 0,
+                key="grupo_input_cad"
+            )
+            
+        with col_compra_qtde:
+            valor_total_compra_input = st.number_input("Valor total da compra (R$)", min_value=0.0, value=st.session_state.valor_total_compra_key, step=0.01, key="valor_total_compra_key")
+            valor_frete_input = st.number_input("Frete (R$)", min_value=0.0, value=st.session_state.valor_frete_key, step=0.01, key="valor_frete_key")
+            
+            # Quantidade para Custos (AGORA FUNCIONAL)
+            qtde_para_custos = st.number_input(
+                "Quantidade para custos",
+                min_value=0.0,
+                value=qtde_custos_final, # Usa o valor calculado automaticamente
+                step=0.01,
+                key="qtde_para_custos_final_key"
+            )
+            
+            percentual_perda_input = st.number_input("% de perda", min_value=0.0, max_value=100.0, value=st.session_state.percentual_perda_key, step=0.5, key="percentual_perda_key")
+            
+            # Expander Nova Unidade (Precisa ficar fora do form para o rerun funcionar no add)
+            with st.expander("➕ Nova unidade / editar existentes"):
+                nova_abrev = st.text_input("Abreviação (ex.: KG, UN, CT)", max_chars=6, key="nova_abrev_input_cad")
+                nova_desc  = st.text_input("Descrição (ex.: Quilograma)", key="nova_desc_input_cad")
+                nova_qtd_padrao = st.number_input("Fator da unidade (p/ auto-cálculo: MIL=1000, CT=100, DZ=12)", min_value=0.0, value=0.0, step=1.0, key="nova_qtd_padrao_input_cad")
+                add_un = st.button("Adicionar unidade", key="add_un_btn_cad") 
+                if add_un:
+                    if nova_abrev.strip() and nova_desc.strip():
+                        udf = carregar_tabela(UNIDS_CSV)
+                        if set(udf.columns) != {"codigo","descricao","qtde_padrao"}:
+                            udf = pd.DataFrame(columns=["codigo","descricao","qtde_padrao"])
+                        if nova_abrev.strip().upper() not in udf["codigo"].values:
+                            udf.loc[len(udf)] = [nova_abrev.strip().upper(), nova_desc.strip(), (nova_qtd_padrao or 1.0)]
+                            salvar_tabela(udf, UNIDS_CSV)
+                            st.success(f"Unidade “{nova_abrev.upper()} – {nova_desc}” adicionada. Ele já aparece na lista.")
+                            st.rerun() 
+                    else:
+                        st.warning("Preencha abreviação e descrição.")
+        
+        st.markdown("---")
+        
+        # Pré-visualização dos cálculos
+        st.markdown("### 💰 Pré-visualização dos cálculos")
+        left, right = st.columns(2)
+        with left:
+            st.write(f"**Valor unitário bruto:** R$ {valor_unit_bruto:.4f}")
+            st.write(f"**Custo total com frete:** R$ {custo_total_com_frete:.2f}")
+            st.write(f"**Quantidade líquida (após perda):** {quantidade_liquida:.4f} {un_med_final}")
+        with right:
+            st.write(f"**Custo real unitário (por UNID. COMPRA):** R$ {custo_real_unitario:.4f}") 
+            st.write(f"**Custo unitário p/ custos (UNID. BASE):** R$ {valor_unit_para_custos:.6f}")
+
+        # --- BLOCO DE DADOS NÃO INTERATIVOS (DENTRO DO FORM) ---
+        st.markdown("---")
         with st.form("cadastro_insumo_form", clear_on_submit=False):
+            st.subheader("2. Detalhes do Insumo e Fornecedor")
             c1, c2 = st.columns(2)
 
             # -------- coluna 1
             with c1:
-                data_compra = st.date_input("Data da compra", value=date.today(), format="DD/MM/YYYY")
-
-                grupo = st.selectbox(
-                    "Grupo", options=grupos,
-                    index=grupos.index("Embalagem") if "Embalagem" in grupos else 0,
-                    key="grupo_input_cad"
-                )
-                with st.expander("➕ Novo grupo / editar existentes"):
-                    novo_grupo = st.text_input("Adicionar novo grupo", key="novo_grupo_input_cad")
-                    add_grupo = st.form_submit_button("Adicionar grupo", key="add_grupo_btn_cad")
-                    if add_grupo:
-                        if novo_grupo.strip():
-                            gdf = carregar_tabela(GRUPOS_CSV)
-                            if "grupo" not in gdf.columns:
-                                gdf = pd.DataFrame({"grupo":[]})
-                            if novo_grupo.strip() not in gdf["grupo"].values:
-                                gdf.loc[len(gdf)] = [novo_grupo.strip()]
-                                salvar_tabela(gdf, GRUPOS_CSV)
-                                st.success(f"Grupo “{novo_grupo}” adicionado. Ele já aparece na lista.")
-                                st.rerun() 
-                        else:
-                            st.warning("Digite um nome para o novo grupo.")
-                            st.rerun()
-
                 nome_resumo = st.text_input("Nome resumido do insumo", value=st.session_state["nome_resumo"], key="nome_resumo_input_cad")
                 if nome_resumo != st.session_state["nome_resumo"]:
                     st.session_state["nome_resumo"] = nome_resumo
@@ -307,100 +441,12 @@ def run_page():
 
                 marca = st.text_input("Marca (opcional)", key="marca_input_cad")
                 tipo = st.selectbox("Tipo", ["Comprado", "Produzido no restaurante"], key="tipo_input_cad")
-
-            # -------- coluna 2
+                
+            # -------- coluna 2 (Fornecedor)
             with c2:
-                un_label_sel = st.selectbox(
-                    "Unidade de medida", options=unidades_labels,
-                    index=unidades_df.index[unidades_df["codigo"]==st.session_state["un_sel"]].tolist()[0]
-                         if st.session_state["un_sel"] in unidades_df["codigo"].values else 0,
-                    key="un_label_sel_input_cad"
-                )
-                un_med = codigo_por_label[un_label_sel]
-                
-                # Guarda o valor no estado temporário para cálculo fora do form
-                st.session_state.un_med_calculated_temp = un_med
-
-                quantidade_compra = st.number_input(
-                    "Quantidade comprada", 
-                    min_value=0.0, 
-                    value=0.0, 
-                    step=0.01, 
-                    key="quantidade_compra_input_cad_temp" # KEY TEMPORÁRIA
-                )
-                
-                # O cálculo é feito no bloco acima, fora do `with st.form`,
-                # e o valor do state é usado no `value` do input.
-                qtde_para_custos = st.number_input(
-                    "Quantidade para custos",
-                    min_value=0.0,
-                    # Valor inicial obtido do cálculo automático no bloco superior
-                    value=float(st.session_state["qtde_para_custos_value"]), 
-                    step=0.01,
-                    key="qtde_para_custos_input_cad"
-                )
-                
-                # Mantenha a sincronia do valor editado manualmente pelo usuário com o estado
-                if qtde_para_custos != st.session_state["qtde_para_custos_value"]:
-                    st.session_state["qtde_para_custos_value"] = qtde_para_custos
-                
-                # Os valores reais a serem usados no salvamento (pegos do input ou do state)
-                quantidade_compra_final = st.session_state.get('quantidade_compra_input_cad_temp', 0.0)
-                qtde_para_custos_final = st.session_state["qtde_para_custos_value"]
-
-                valor_total_compra = st.number_input("Valor total da compra (R$)", min_value=0.0, value=0.0, step=0.01, key="valor_total_compra_input_cad")
-                valor_frete = st.number_input("Frete (R$)", min_value=0.0, value=0.0, step=0.01, key="valor_frete_input_cad")
-                percentual_perda = st.number_input("% de perda", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="percentual_perda_input_cad")
-
-                with st.expander("➕ Nova unidade / editar existentes"):
-                    # ... (Lógica de Nova Unidade mantida) ...
-                    nova_abrev = st.text_input("Abreviação (ex.: KG, UN, CT)", max_chars=6, key="nova_abrev_input_cad")
-                    nova_desc  = st.text_input("Descrição (ex.: Quilograma)", key="nova_desc_input_cad")
-                    nova_qtd_padrao = st.number_input("Fator da unidade (p/ auto-cálculo: MIL=1000, CT=100, DZ=12)", min_value=0.0, value=0.0, step=1.0, key="nova_qtd_padrao_input_cad")
-                    add_un = st.form_submit_button("Adicionar unidade", key="add_un_btn_cad")
-                    if add_un:
-                        if nova_abrev.strip() and nova_desc.strip():
-                            udf = carregar_tabela(UNIDS_CSV)
-                            if set(udf.columns) != {"codigo","descricao","qtde_padrao"}:
-                                udf = pd.DataFrame(columns=["codigo","descricao","qtde_padrao"])
-                            if nova_abrev.strip().upper() not in udf["codigo"].values:
-                                udf.loc[len(udf)] = [nova_abrev.strip().upper(), nova_desc.strip(), (nova_qtd_padrao or 1.0)]
-                                salvar_tabela(udf, UNIDS_CSV)
-                                st.success(f"Unidade “{nova_abrev.upper()} – {nova_desc}” adicionada. Ele já aparece na lista.")
-                                st.rerun()
-                        else:
-                            st.warning("Preencha abreviação e descrição.")
-                            st.rerun()
-
-
-            # Cálculos automáticos (Pré-visualização) - Usando os valores FINAIS/REAIS
-            valor_unit_bruto = (valor_total_compra / quantidade_compra_final) if quantidade_compra_final > 0 else 0.0
-            custo_total_com_frete = valor_total_compra + valor_frete
-            
-            quantidade_liquida = quantidade_compra_final * (1 - percentual_perda/100.0) if quantidade_compra_final > 0 else 0.0
-            custo_real_unitario = (custo_total_com_frete / quantidade_liquida) if quantidade_liquida > 0 else 0.0
-            
-            # CÁLCULO FINAL CORRETO: Custo na UNIDADE BASE de CUSTOS
-            qtde_para_custos_ajustada_por_perda = qtde_para_custos_final * (1 - percentual_perda/100.0)
-            valor_unit_para_custos = (custo_total_com_frete / qtde_para_custos_ajustada_por_perda) if qtde_para_custos_ajustada_por_perda > 0 else 0.0
-
-            st.markdown("### 💰 Pré-visualização dos cálculos")
-            left, right = st.columns(2)
-            with left:
-                st.write(f"**Valor unitário bruto:** R$ {valor_unit_bruto:.4f}")
-                st.write(f"**Custo total com frete:** R$ {custo_total_com_frete:.2f}")
-                st.write(f"**Quantidade líquida (após perda):** {quantidade_liquida:.4f} {un_med}")
-            with right:
-                st.write(f"**Custo real unitário (por UNID. COMPRA):** R$ {custo_real_unitario:.4f}") 
-                st.write(f"**Custo unitário p/ custos (UNID. BASE):** R$ {valor_unit_para_custos:.6f}")
-
-            st.markdown("### 🧾 Fornecedor e contato (opcional)")
-            c3, c4 = st.columns(2)
-            with c3:
                 fornecedor = st.text_input("Fornecedor", key="fornecedor_input_cad")
                 fone_fornecedor = st.text_input("Fone do fornecedor", key="fone_fornecedor_input_cad")
                 documento = st.text_input("Documento / Nota Fiscal", key="documento_input_cad")
-            with c4:
                 representante = st.text_input("Representante", key="representante_input_cad")
                 observacao = st.text_area("Observação", key="observacao_input_cad")
 
@@ -408,7 +454,8 @@ def run_page():
 
         # Persistência
         if 'enviado' in locals() and enviado:
-            if not st.session_state["nome_resumo"].strip() or quantidade_compra_final <= 0 or valor_total_compra <= 0:
+            
+            if not st.session_state["nome_resumo"].strip() or qtde_compra_final <= 0 or valor_total_compra_input <= 0:
                  st.error("Campos obrigatórios: Nome Resumido, Quantidade Comprada e Valor Total.")
             else:
                 # 1. Salva a compra histórica
@@ -416,8 +463,8 @@ def run_page():
                 novo = {
                     "data_compra": data_compra.strftime("%d/%m/%Y"), "grupo": grupo, "insumo_resumo": st.session_state["nome_resumo"],
                     "insumo_completo": st.session_state["nome_completo"] or st.session_state["nome_resumo"], "marca": marca, "tipo": tipo,
-                    "un_med": un_med, "quantidade_compra": quantidade_compra_final, "qtde_para_custos": qtde_para_custos_final,
-                    "valor_total_compra": valor_total_compra, "valor_frete": valor_frete, "percentual_perda": percentual_perda,
+                    "un_med": un_med_final, "quantidade_compra": qtde_compra_final, "qtde_para_custos": qtde_custos_final,
+                    "valor_total_compra": valor_total_compra_input, "valor_frete": valor_frete_input, "percentual_perda": percentual_perda_input,
                     "valor_unit_bruto": round(valor_unit_bruto,4), "custo_total_com_frete": round(custo_total_com_frete,2),
                     "quantidade_liquida": round(quantidade_liquida,4), "custo_real_unitario": round(custo_real_unitario,6),
                     "valor_unit_para_custos": round(valor_unit_para_custos,6), "fornecedor": fornecedor, "fone_fornecedor": fone_fornecedor,
@@ -434,130 +481,105 @@ def run_page():
                 # LIMPAR O FORMULÁRIO APÓS SALVAR
                 reset_session_state()
                 st.session_state.acao_manual_change = False
-                st.session_state.current_edit_insumo = None 
+                st.session_state.current_page_action = "Visualizar" # Manda o usuário para o relatório
                 
                 st.success(f"Insumo **{novo['insumo_resumo']}** salvo com sucesso! Formulário resetado para novo cadastro.")
                 st.rerun() 
 
     # =========================================================
-    # EDITAR (Mantido e agora funcional)
+    # MODO VISUALIZAR (RELATÓRIO COM FILTROS E EDIÇÃO)
     # =========================================================
-    elif acao == "✏️ Editar insumo":
-        df_compras = carregar_tabela(COMPRAS_CSV)
-        if df_compras.empty:
-            st.info("Nenhum insumo cadastrado para edição. Cadastre um novo primeiro. 🙂")
-        else:
-            insumos_list = sorted(df_compras["insumo_resumo"].unique().tolist())
-            
-            default_index = insumos_list.index(st.session_state.current_edit_insumo) if st.session_state.current_edit_insumo in insumos_list else 0
-            
-            def on_select_insumo():
-                 # Força o carregamento de dados ao selecionar um item diferente
-                 if st.session_state.insumo_selecionado_edit != st.session_state.current_edit_insumo:
-                    load_insumo_data(st.session_state.insumo_selecionado_edit)
-
-            insumo_selecionado = st.selectbox("Selecione o insumo para editar:", insumos_list, index=default_index, key="insumo_selecionado_edit", on_change=on_select_insumo)
-            
-            if not st.session_state.current_edit_insumo and insumo_selecionado:
-                load_insumo_data(insumo_selecionado)
-
-            if st.session_state.current_edit_insumo:
-                
-                edit_data = st.session_state.current_edit_data
-                st.subheader(f"✏️ Editando: {edit_data.get('insumo_resumo', '')}")
-                
-                grupos = lista_grupos()
-                unidades_df = lista_unidades()
-                unidades_labels = unidades_df.apply(label_unidade, axis=1).tolist()
-                
-                grupo_index = grupos.index(edit_data.get("grupo")) if edit_data.get("grupo") in grupos else 0
-                
-                un_label_sel = f"{edit_data.get('un_med')} – {unidades_df[unidades_df['codigo'] == edit_data.get('un_med')].iloc[0]['descricao']}" if edit_data.get("un_med") in unidades_df['codigo'].values and not unidades_df[unidades_df['codigo'] == edit_data.get('un_med')].empty else unidades_labels[0]
-                un_label_index = unidades_labels.index(un_label_sel) if un_label_sel in unidades_labels else 0
-                tipo_index = ["Comprado", "Produzido no restaurante"].index(edit_data.get("tipo")) if edit_data.get("tipo") in ["Comprado", "Produzido no restaurante"] else 0
-                
-                qtde_compra_val = float(edit_data.get("quantidade_compra", 0.0))
-                qtde_custos_val = float(edit_data.get("qtde_para_custos", 0.0))
-                valor_total_val = float(edit_data.get("valor_total_compra", 0.0))
-                frete_val = float(edit_data.get("valor_frete", 0.0))
-                perda_val = float(edit_data.get("percentual_perda", 0.0))
-                data_compra_val = pd.to_datetime(edit_data.get("data_compra"), format="%d/%m/%Y", errors='coerce').date() if edit_data.get("data_compra") else date.today()
-
-                with st.form("edicao_insumo_form", clear_on_submit=False):
-                    c1, c2 = st.columns(2)
-                    
-                    with c1:
-                        st.date_input("Data da compra (Data da última compra)", value=data_compra_val, format="DD/MM/YYYY", key="edit_data_compra")
-                        st.selectbox("Grupo", options=grupos, index=grupo_index, key="edit_grupo")
-                        st.text_input("Nome resumido do insumo", value=st.session_state["nome_resumo"], key="edit_nome_resumo")
-                        st.text_input("Nome completo do insumo", value=st.session_state["nome_completo"], key="edit_nome_completo")
-                        st.text_input("Marca (opcional)", value=edit_data.get("marca"), key="edit_marca")
-                        st.selectbox("Tipo", ["Comprado", "Produzido no restaurante"], index=tipo_index, key="edit_tipo")
-
-                    with c2:
-                        st.selectbox("Unidade de medida", options=unidades_labels, index=un_label_index, key="edit_un_label_sel")
-                        st.number_input("Quantidade comprada", min_value=0.0, value=qtde_compra_val, step=0.01, key="edit_quantidade_compra")
-                        st.number_input("Quantidade para custos", min_value=0.0, value=qtde_custos_val, step=0.01, key="edit_qtde_para_custos")
-                        
-                        st.number_input("Valor total da compra (R$)", min_value=0.0, value=valor_total_val, step=0.01, key="edit_valor_total_compra")
-                        st.number_input("Frete (R$)", min_value=0.0, value=frete_val, step=0.01, key="edit_valor_frete")
-                        st.number_input("% de perda", min_value=0.0, max_value=100.0, value=perda_val, step=0.5, key="edit_percentual_perda")
-
-                    st.markdown("---")
-                    st.text_input("Fornecedor", value=edit_data.get("fornecedor"), key="edit_fornecedor")
-                    st.text_area("Observação", value=edit_data.get("observacao"), key="edit_observacao")
-                    
-                    editado = st.form_submit_button("✅ Salvar Compra Corrigida/Atualizada")
-
-                if editado:
-                    # TODO: Lógica de salvar como NOVA COMPRA (com data de hoje)
-                    st.info("A lógica de salvamento da EDIÇÃO (que gera uma nova compra no histórico) será implementada na próxima fase. A edição está funcionando visualmente!")
-                    st.rerun()
-
-
-    # =========================================================
-    # LISTA (MÓDULO DE RELATÓRIOS) (Mantido)
-    # =========================================================
-    elif acao == "📋 Visualizar insumos":
+    elif st.session_state.current_page_action in ["Visualizar", "Edição"]:
         st.markdown("### 📋 Relatório de Insumos Ativos")
         
+        # Carrega as tabelas para busca e relatório
         df_ativos = carregar_tabela(INSUMOS_ATIVOS_CSV, force_dtype={"custo_unit_ativo": float})
+        df_compras_full = carregar_tabela(COMPRAS_CSV) # Para extrair todos os fornecedores/representantes
         
         if df_ativos.empty:
             st.info("Nenhum insumo ativo encontrado. Cadastre um novo primeiro.")
         else:
-            c1, c2 = st.columns([2, 1])
+            # === FILTROS AVANÇADOS ===
+            col_grupo, col_forn, col_busca = st.columns([1, 1, 1])
             
+            # Filtro 1: Grupo
             grupos_disponiveis = ["Todos"] + sorted(df_ativos["grupo"].unique().tolist())
-            grupo_filtro = c1.selectbox("Filtrar por Grupo:", grupos_disponiveis, index=0)
+            grupo_filtro = col_grupo.selectbox("Filtrar por Grupo:", grupos_disponiveis, index=0)
             
-            termo_busca = c2.text_input("Buscar por Nome:", value="").strip().lower()
+            # Filtro 2: Fornecedor
+            fornecedores = ["Todos"] + sorted(df_compras_full["fornecedor"].dropna().astype(str).unique().tolist())
+            fornecedor_filtro = col_forn.selectbox("Filtrar por Fornecedor:", fornecedores, index=0)
+            
+            # Filtro 3: Busca (Nome ou Representante)
+            termo_busca = col_busca.text_input("Buscar (Insumo ou Representante):", value="").strip().lower()
 
             df_filtrado = df_ativos.copy()
             
+            # Aplica os Filtros
             if grupo_filtro != "Todos":
                 df_filtrado = df_filtrado[df_filtrado["grupo"] == grupo_filtro]
             
+            if fornecedor_filtro != "Todos":
+                # Cruza com a tabela de compras para encontrar o insumo associado ao fornecedor
+                insumos_por_fornecedor = df_compras_full[df_compras_full["fornecedor"] == fornecedor_filtro]["insumo_resumo"].unique()
+                df_filtrado = df_filtrado[df_filtrado["insumo_resumo"].isin(insumos_por_fornecedor)]
+            
             if termo_busca:
-                df_filtrado = df_filtrado[
-                    df_filtrado["insumo_resumo"].str.lower().str.contains(termo_busca, na=False) |
-                    df_filtrado["grupo"].str.lower().str.contains(termo_busca, na=False)
-                ]
+                # Busca por nome resumido, nome completo OU representante
+                df_compras_busca = df_compras_full[['insumo_resumo', 'insumo_completo', 'representante']].drop_duplicates(subset=['insumo_resumo'])
+                
+                insumos_por_busca = df_compras_busca[
+                    df_compras_busca["insumo_resumo"].str.lower().str.contains(termo_busca, na=False) |
+                    df_compras_busca["insumo_completo"].str.lower().str.contains(termo_busca, na=False) |
+                    df_compras_busca["representante"].str.lower().str.contains(termo_busca, na=False)
+                ]["insumo_resumo"].unique()
+                
+                df_filtrado = df_filtrado[df_filtrado["insumo_resumo"].isin(insumos_por_busca)]
+            
+            
+            # --- INTEGRAÇÃO COM EDIÇÃO ---
+            st.markdown("---")
+            st.caption("Clique em **Ações** para editar ou ver detalhes do histórico de compras.")
+
+            # Adiciona a coluna de Edição
+            df_display = df_filtrado.copy()
+            
+            # Função para criar o botão HTML (o valor da key é o insumo_resumo)
+            def create_edit_button(insumo_resumo):
+                return f'<button class="edit-button-style" onclick="document.getElementById(\'edit_trigger_{insumo_resumo}\').click();">Editar</button>'
+
+            df_display['Ações'] = df_display['insumo_resumo'].apply(create_edit_button)
+
+            # Colunas para exibição no DataFrame
+            cols_map = {
+                "insumo_resumo": "Insumo", "grupo": "Grupo", "un_med": "Unidade Base",
+                "custo_unit_ativo": "Custo Unitário Ativo (R$)", "data_ultima_compra": "Última Compra",
+                "Ações": "Ações"
+            }
             
             st.dataframe(
-                df_filtrado.rename(columns={
-                    "insumo_resumo": "Insumo", "grupo": "Grupo", "un_med": "Unidade Base",
-                    "custo_unit_ativo": "Custo Unitário Ativo (R$)", "data_ultima_compra": "Última Compra"
-                }), 
+                df_display.rename(columns=cols_map)[list(cols_map.values())],
                 use_container_width=True,
                 column_config={
                     "Custo Unitário Ativo (R$)": st.column_config.NumberColumn(
                         format="R$ %0.6f"
+                    ),
+                    "Ações": st.column_config.TextColumn(
+                        # Permite que o HTML do botão seja renderizado
+                        # O st.markdown abaixo cuidará do clique
                     )
                 }
             )
-
+            
             st.caption(f"Total de insumos ativos: {len(df_filtrado)}")
+            
+            # --- CAPTURA DE CLIQUE NO BOTÃO DE EDIÇÃO ---
+            # Para cada linha, cria um st.button oculto para capturar o clique do HTML
+            for insumo in df_filtrado['insumo_resumo']:
+                if st.button(f"Editar {insumo}", key=f"edit_trigger_{insumo}"):
+                    # Este callback dispara o load_insumo_data e muda o estado para Edição
+                    st.session_state.edit_insumo_trigger = insumo
+                    st.rerun()
 
 
     # =========================================================
