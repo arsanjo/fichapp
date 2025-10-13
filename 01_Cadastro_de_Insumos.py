@@ -1,5 +1,5 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM CORREÇÃO DEFINITIVA DO ERRO DE RADIO BUTTON (V8.7 - Estabilidade Total)
+# CÓDIGO FINAL COM CORREÇÃO DEFINITIVA DO ERRO "cannot be modified" DEVIDO À ORDEM DO RESET (V8.8)
 
 import streamlit as st
 import pandas as pd
@@ -280,9 +280,7 @@ def run_page():
             st.session_state.qtde_para_custos_last_value = calculated_qtde_custos
             st.session_state["qtde_para_custos_value"] = calculated_qtde_custos
         
-        # Se for a primeira execução/reset, a chave "qtde_para_custos_final_key" ainda não existe no
-        # dicionário do session_state, então usamos o valor de qtde_para_custos_value para o input.
-        # Caso contrário, o Streamlit usará o valor digitado/clicado (qtde_para_custos_final_key).
+        # O Streamlit armazena o valor final do input na chave qtde_para_custos_final_key no final do ciclo.
 
     # Variáveis de trabalho (Usadas para o cálculo de Pré-visualização e Persistência)
     qtde_compra_final = st.session_state.qtde_compra_key
@@ -581,15 +579,14 @@ def run_page():
                 # 2. Salva ou atualiza a Tabela Mestra Ativa
                 salvar_insumo_ativo(df_compras)
 
-                # CORREÇÃO: Limpa o formulário e força o rerurn para a aba de visualização
+                # CORREÇÃO: Altera o estado e Força o re-run
                 st.session_state.current_page_action = "Visualizar" 
-                # NOTA: Não alteramos acao_radio_key aqui para evitar o erro "cannot be modified".
-                # A função reset_session_state() abaixo re-inicializa acao_radio_key para 'Cadastro'.
-                # O if/else abaixo do st.radio forçará o estado para 'Visualizar' no próximo re-run.
-                reset_session_state() 
                 
                 st.success(f"Insumo **{novo['insumo_resumo']}** salvo com sucesso! Indo para Relatório.")
                 st.rerun() 
+                
+                # A redefinição de estado deve vir APÓS o rerun para que seja aplicada no próximo ciclo
+                reset_session_state() # O Streamlit processa esta linha no NEXT RUN (após o rerun)
 
     # =========================================================
     # MODO VISUALIZAR (RELATÓRIO COM FILTROS E EDIÇÃO)
