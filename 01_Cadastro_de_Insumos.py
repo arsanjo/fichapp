@@ -1,11 +1,11 @@
 # 01_Cadastro_de_Insumos.py
-# CÓDIGO FINAL COM ESTRUTURA DE 2 ABAS E CORREÇÃO DE ERRO DE ÍNDICE (V8.3)
+# CÓDIGO FINAL COM ESTRUTURA DE 2 ABAS E CORREÇÃO DE ERRO DE ÍNDICE DEFINITIVA (V8.4)
 
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 import os, json, random
-# from utils.nav import sidebar_menu # Comentado porque não é usado no script principal
+# A importação de 'sidebar_menu' é removida, pois não é utilizada no script principal e pode causar warnings/erros.
 
 # =========================================================
 # FUNÇÃO PRINCIPAL DE EXECUÇÃO DA PÁGINA
@@ -28,7 +28,6 @@ def run_page():
     .stButton>button:hover, .stForm form button[kind="primary"]{
       background: #1e293b;
     }
-    /* Estilo para o botão de edição na tabela */
     .edit-button-style { background-color: #f7a81b; color: #000; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
 
     #fichapp-footer {
@@ -170,7 +169,8 @@ def run_page():
         st.session_state.percentual_perda_key = 0.0
         st.session_state.un_med_select_key = "UN"
         st.session_state["qtde_para_custos_value"] = 0.0
-        st.session_state.acao_radio = "➕ Cadastrar novo insumo" # Garante o radio button no estado inicial
+        st.session_state.current_page_action = "Cadastro" # Garante o estado inicial
+        st.session_state.acao_radio_key = "➕ Cadastrar novo insumo" # Garante o radio button no estado inicial
 
     defaults = {
         "nome_resumo": "", "nome_completo": "", "nome_completo_lock": True,
@@ -179,7 +179,7 @@ def run_page():
         "qtde_compra_key": 0.0, "valor_total_compra_key": 0.0, "valor_frete_key": 0.0, "percentual_perda_key": 0.0,
         "un_med_select_key": "UN", "qtde_para_custos_value": 0.0,
         "current_page_action": "Cadastro",
-        "acao_radio": "➕ Cadastrar novo insumo"
+        "acao_radio_key": "➕ Cadastrar novo insumo"
     }
     for k,v in defaults.items():
         if k not in st.session_state:
@@ -187,7 +187,6 @@ def run_page():
 
     def load_insumo_data(insumo_resumo):
         df_compras = carregar_tabela(COMPRAS_CSV)
-        # Tenta encontrar a última compra
         try:
              ultima_compra = df_compras[df_compras['insumo_resumo'] == insumo_resumo].sort_values(by='atualizado_em', ascending=False).iloc[0]
         except IndexError:
@@ -208,7 +207,7 @@ def run_page():
         st.session_state["current_edit_data"] = ultima_compra.to_dict()
         st.session_state.current_edit_insumo = insumo_resumo
         st.session_state.current_page_action = "Edição" 
-        st.session_state.acao_radio = "📋 Visualizar insumos (e Editar)" # Altera o rádio para Edição
+        st.session_state.acao_radio_key = "📋 Visualizar insumos (e Editar)" 
         
         st.rerun()
 
@@ -255,12 +254,20 @@ def run_page():
     percentual_perda = st.session_state.percentual_perda_key
     un_med_final = st.session_state.un_med_select_key
     
+    # Cálculos automáticos (Pré-visualização)
+    valor_unit_bruto = (valor_total_compra / qtde_compra_final) if qtde_compra_final > 0 else 0.0
+    custo_total_com_frete = valor_total_compra + valor_frete
+    quantidade_liquida = qtde_compra_final * (1 - percentual_perda/100.0) if qtde_compra_final > 0 else 0.0
+    custo_real_unitario = (custo_total_com_frete / quantidade_liquida) if quantidade_liquida > 0 else 0.0
+    qtde_para_custos_ajustada_por_perda = qtde_custos_final * (1 - percentual_perda/100.0)
+    valor_unit_para_custos = (custo_total_com_frete / qtde_para_custos_ajustada_por_perda) if qtde_para_custos_ajustada_por_perda > 0 else 0.0
+    
     # =========================================================
     # Cabeçalho da Página
     # =========================================================
     st.markdown("<h1>📦 Cadastro de Insumos</h1>", unsafe_allow_html=True)
     
-    # --- RADIO BUTTON (Removendo a opção de 3, forçando o novo fluxo) ---
+    # --- RADIO BUTTON (Estrutura de 2 Abas) ---
     
     # Determina o índice ativo
     index_acao = 0 if st.session_state.current_page_action in ["Cadastro", "Edição"] else 1
@@ -270,20 +277,26 @@ def run_page():
         st.session_state.acao_manual_change = True
         st.session_state.current_edit_insumo = None 
         if new_action != st.session_state.current_page_action:
-            reset_session_state()
+            # Não faz reset_session_state() aqui, pois ele é chamado dentro do handle_radio_change
             st.session_state.current_page_action = new_action
             st.rerun()
 
     # Callback para o Radio Button
     def handle_radio_change():
         if st.session_state.acao_radio_key == "➕ Cadastrar novo insumo":
-            set_page_action_and_reset("Cadastro")
+            # Se a ação era "Visualizar/Edição", reseta para Cadastro
+            if st.session_state.current_page_action != "Cadastro":
+                reset_session_state() # Reseta para limpar a edição
+                set_page_action_and_reset("Cadastro")
         elif st.session_state.acao_radio_key == "📋 Visualizar insumos (e Editar)":
-            set_page_action_and_reset("Visualizar")
+            # Se a ação era "Cadastro", muda para Visualizar
+            if st.session_state.current_page_action != "Visualizar":
+                st.session_state.current_edit_insumo = None # Limpa qualquer edição anterior
+                set_page_action_and_reset("Visualizar")
 
     acao = st.radio("Ação:", ["➕ Cadastrar novo insumo", "📋 Visualizar insumos (e Editar)"], 
                     index=index_acao,
-                    key="acao_radio_key", # Alterado para evitar conflito
+                    key="acao_radio_key", 
                     on_change=handle_radio_change)
     
 
@@ -379,14 +392,21 @@ def run_page():
         # --- BLOCO DE INPUTS INTERATIVOS (FORA DO FORM) ---
         col_compra_data, col_compra_qtde = st.columns(2)
         
-        # Encontra o índice correto do selectbox (usando a lógica mais segura)
+        # Encontra o índice correto do selectbox (LÓGICA CORRIGIDA E SEGURA)
         un_codes_list = unidades_df["codigo"].to_list()
         un_default_index_for_cad = 0
         try:
+             # Busca pelo valor atual do session_state, caindo em 0 se não encontrar
              un_default_index_for_cad = un_codes_list.index(st.session_state.un_med_select_key)
         except ValueError:
-             un_default_index_for_cad = 0
-
+             # Se o valor do session_state for 'UN' (padrão) mas a lista ainda não tem 'UN',
+             # ou se estiver corrompido, busca o índice de 'UN' diretamente na lista original
+             try:
+                 un_default_index_for_cad = un_codes_list.index("UN")
+             except ValueError:
+                 un_default_index_for_cad = 0 # Valor padrão (primeiro item)
+             
+        # Encontra o índice do grupo
         try:
              grupo_default_index = grupos.index(st.session_state.get('grupo_input_cad', grupos[0]))
         except ValueError:
@@ -399,11 +419,12 @@ def run_page():
             un_label_sel = st.selectbox(
                 "Unidade de medida", options=unidades_labels,
                 index=un_default_index_for_cad,
-                key="un_med_select_key" 
+                key="un_med_select_key_label" # Key alterada para evitar colisão/instabilidade
             )
+            # Mapeia a label selecionada de volta para o código (UN, KG, DZ...)
             un_med_current = codigo_por_label[un_label_sel]
             
-            # Sincroniza o estado. Quando o valor for diferente, o código de cálculo acima rodará
+            # Sincroniza o estado para que a lógica de cálculo (fora do form) funcione
             if st.session_state.un_med_select_key != un_med_current:
                  st.session_state.un_med_select_key = un_med_current
                  st.rerun() 
@@ -433,7 +454,7 @@ def run_page():
             
             percentual_perda_input = st.number_input("% de perda", min_value=0.0, max_value=100.0, value=st.session_state.percentual_perda_key, step=0.5, key="percentual_perda_key")
             
-            # Expander Nova Unidade (Precisa ficar fora do form para o rerun funcionar no add)
+            # Expander Nova Unidade (fora do form)
             with st.expander("➕ Nova unidade / editar existentes"):
                 nova_abrev = st.text_input("Abreviação (ex.: KG, UN, CT)", max_chars=6, key="nova_abrev_input_cad")
                 nova_desc  = st.text_input("Descrição (ex.: Quilograma)", key="nova_desc_input_cad")
@@ -566,12 +587,10 @@ def run_page():
                 df_filtrado = df_filtrado[df_filtrado["grupo"] == grupo_filtro]
             
             if fornecedor_filtro != "Todos":
-                # Cruza com a tabela de compras para encontrar o insumo associado ao fornecedor
                 insumos_por_fornecedor = df_compras_full[df_compras_full["fornecedor"] == fornecedor_filtro]["insumo_resumo"].unique()
                 df_filtrado = df_filtrado[df_filtrado["insumo_resumo"].isin(insumos_por_fornecedor)]
             
             if termo_busca:
-                # Busca por nome resumido, nome completo OU representante
                 df_compras_busca = df_compras_full[['insumo_resumo', 'insumo_completo', 'representante']].drop_duplicates(subset=['insumo_resumo'])
                 
                 insumos_por_busca = df_compras_busca[
@@ -587,11 +606,10 @@ def run_page():
             st.markdown("---")
             st.caption("A tabela abaixo mostra o custo ativo de cada insumo. Use o seletor abaixo para editar a última compra.")
 
-            # Adiciona a coluna de Ações
+            # Adiciona a coluna de Ações (Apenas como label visual)
             df_display = df_filtrado.copy()
             df_display['Ações'] = 'Editar'
             
-            # Colunas para exibição no DataFrame
             cols_map = {
                 "insumo_resumo": "Insumo", "grupo": "Grupo", "un_med": "Unidade Base",
                 "custo_unit_ativo": "Custo Unitário Ativo (R$)", "data_ultima_compra": "Última Compra",
@@ -607,20 +625,19 @@ def run_page():
                     "Custo Unitário Ativo (R$)": st.column_config.NumberColumn(
                         format="R$ %0.6f"
                     ),
-                    "Ações": st.column_config.Column(
-                        # A coluna de ações agora é apenas um texto estático
-                    )
+                    "Ações": st.column_config.Column()
                 }
             )
             
             st.caption(f"Total de insumos ativos: {len(df_filtrado)}")
             
-            # --- CAPTURA DE CLIQUE NO BOTÃO DE EDIÇÃO ---
+            # --- SELETOR PARA EDIÇÃO ---
             st.markdown("---")
             st.markdown("Selecione o insumo para editar a última compra:")
             
             if insumos_com_acao:
-                insumo_selecionado = st.selectbox("Insumo:", insumos_com_acao, key="selectbox_edicao_insumo")
+                # O índice padrão deve ser 0
+                insumo_selecionado = st.selectbox("Insumo:", insumos_com_acao, index=0, key="selectbox_edicao_insumo")
                 
                 if st.button(f"✏️ Editar última compra de: {insumo_selecionado}", key="trigger_edit_btn"):
                     st.session_state.edit_insumo_trigger = insumo_selecionado
