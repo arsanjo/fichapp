@@ -32,7 +32,7 @@ h1, h2, h3, h4 { font-weight: 700; }
 st.markdown(DARK_CSS, unsafe_allow_html=True)
 
 # =========================================================
-# MENU (protegido)
+# MENU (isolado para evitar run_page)
 # =========================================================
 try:
     from utils.nav import sidebar_menu
@@ -51,8 +51,7 @@ FICHAS_CSV = os.path.join(DATA_DIR, "fichas_tecnicas.csv")
 if not os.path.exists(FICHAS_CSV):
     pd.DataFrame(columns=[
         "nome_prato","codigo_interno","codigo_sistema","codigo_pdv","categoria",
-        "rendimento_total","peso_por_porcao","responsavel","modo_preparo","obs_tecnicas",
-        "tempo_preparo","temperatura","equipamentos","armazenamento","foto_path",
+        "rendimento_total","peso_por_porcao","responsavel",
         "ingredientes_json","atualizado_em"
     ]).to_csv(FICHAS_CSV, index=False)
 
@@ -68,7 +67,7 @@ def salvar_tabela(df: pd.DataFrame, path: str):
     st.cache_data.clear()
 
 # =========================================================
-# Prefixos (pode editar conforme sua lógica)
+# Prefixos
 # =========================================================
 PREFIXOS = {
     "Hossomaki": 13,
@@ -105,7 +104,9 @@ def proximo_codigo_interno(categoria: str) -> str:
 if "ingredientes" not in st.session_state:
     st.session_state["ingredientes"] = []
 
-# Carregar insumos
+# =========================================================
+# Dados de insumos
+# =========================================================
 insumos_df = carregar_tabela(COMPRAS_CSV)
 insumos_opcoes = []
 insumo_para_un = {}
@@ -118,11 +119,11 @@ if not insumos_df.empty:
             insumo_para_un[nome] = un
 
 # =========================================================
-# UI — Cabeçalho
+# Cabeçalho do formulário
 # =========================================================
 st.markdown("<h1>Ficha Técnica — Parte da Cozinha</h1>", unsafe_allow_html=True)
 
-with st.form("ficha_cozinha"):
+with st.form("ficha_cabecalho"):
     cab1, cab2 = st.columns(2)
     with cab1:
         nome_prato = st.text_input("Nome do prato", placeholder="Ex.: Uramaki Salmão Filadélfia")
@@ -131,7 +132,6 @@ with st.form("ficha_cozinha"):
         peso_por_porcao = st.number_input("Peso médio por porção (g/ml)", min_value=0.0, value=0.0)
         responsavel = st.text_input("Responsável pela elaboração", placeholder="Nome do colaborador")
     with cab2:
-        # Gera o código somente se a categoria for escolhida
         codigo_interno = ""
         if categoria != "— selecione —":
             codigo_interno = proximo_codigo_interno(categoria)
@@ -140,81 +140,83 @@ with st.form("ficha_cozinha"):
         codigo_pdv = st.text_input("Código PDV (opcional)")
         st.caption(f"Atualização: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    st.divider()
+    salvar_header = st.form_submit_button("💾 Salvar Cabeçalho")
 
-    # =========================================================
-    # Ingredientes
-    # =========================================================
-    st.markdown("### 🧾 Ingredientes (vinculados ao cadastro de insumos)")
-
-    if not st.session_state["ingredientes"]:
-        st.info("Nenhum ingrediente adicionado ainda.")
-    else:
-        for idx, item in enumerate(st.session_state["ingredientes"]):
-            with st.expander(f"Ingrediente #{idx+1}", expanded=True):
-                c1, c2, c3, c4 = st.columns([3, 1.2, 1.2, 2])
-                with c1:
-                    item["insumo"] = st.selectbox(
-                        "Insumo",
-                        options=["— selecione —"] + insumos_opcoes,
-                        index=0 if not item.get("insumo") else insumos_opcoes.index(item.get("insumo")) + 1,
-                        key=f"ins_{idx}"
-                    )
-                with c2:
-                    item["quantidade"] = st.number_input("Quantidade", min_value=0.0, value=float(item.get("quantidade", 0.0)), step=0.01, key=f"qt_{idx}")
-                with c3:
-                    unidade_auto = insumo_para_un.get(item.get("insumo", ""), "")
-                    st.text_input("Unidade", value=unidade_auto, disabled=True, key=f"un_{idx}")
-                    item["unidade"] = unidade_auto
-                with c4:
-                    item["obs"] = st.text_input("Observação (opcional)", value=item.get("obs", ""), key=f"obs_{idx}")
-                if st.button(f"🗑️ Remover ingrediente #{idx+1}", key=f"rm_{idx}"):
-                    st.session_state["ingredientes"].pop(idx)
-                    st.rerun()
-
-    st.divider()
-    if st.form_submit_button("💾 Salvar Ficha Técnica", use_container_width=True):
-        if not nome_prato.strip():
-            st.error("Informe o nome do prato.")
-            st.stop()
-        if categoria == "— selecione —":
-            st.error("Selecione uma categoria válida.")
-            st.stop()
-        ingredientes_validos = [i for i in st.session_state["ingredientes"] if i.get("insumo") and float(i.get("quantidade", 0)) > 0]
-        if not ingredientes_validos:
-            st.error("Adicione ao menos um ingrediente com quantidade.")
-            st.stop()
-
-        fichas = carregar_tabela(FICHAS_CSV)
-        novo = {
-            "nome_prato": nome_prato.strip(),
-            "codigo_interno": codigo_interno.strip(),
-            "codigo_sistema": codigo_sistema.strip(),
-            "codigo_pdv": codigo_pdv.strip(),
-            "categoria": categoria,
-            "rendimento_total": rendimento_total,
-            "peso_por_porcao": peso_por_porcao,
-            "responsavel": responsavel.strip(),
-            "modo_preparo": "",
-            "obs_tecnicas": "",
-            "tempo_preparo": 0,
-            "temperatura": "",
-            "equipamentos": "",
-            "armazenamento": "",
-            "foto_path": "",
-            "ingredientes_json": json.dumps(ingredientes_validos, ensure_ascii=False),
-            "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        fichas = pd.concat([fichas, pd.DataFrame([novo])], ignore_index=True)
-        salvar_tabela(fichas, FICHAS_CSV)
-        st.success(f"Ficha técnica de **{novo['nome_prato']}** salva com sucesso! (FT {novo['codigo_interno']})")
+if salvar_header:
+    st.success("Cabeçalho salvo! Agora adicione os ingredientes abaixo.")
 
 # =========================================================
-# Botão adicionar ingrediente (fora do form)
+# Ingredientes (fora do form)
 # =========================================================
+st.divider()
+st.markdown("### 🧾 Ingredientes (vinculados ao cadastro de insumos)")
+
+if not st.session_state["ingredientes"]:
+    st.info("Nenhum ingrediente adicionado ainda.")
+else:
+    for idx, item in enumerate(st.session_state["ingredientes"]):
+        with st.expander(f"Ingrediente #{idx+1}", expanded=True):
+            c1, c2, c3, c4 = st.columns([3, 1.2, 1.2, 2])
+            with c1:
+                item["insumo"] = st.selectbox(
+                    "Insumo",
+                    options=["— selecione —"] + insumos_opcoes,
+                    index=0 if not item.get("insumo") else insumos_opcoes.index(item.get("insumo")) + 1,
+                    key=f"ins_{idx}"
+                )
+            with c2:
+                item["quantidade"] = st.number_input("Quantidade", min_value=0.0,
+                                                    value=float(item.get("quantidade", 0.0)), step=0.01, key=f"qt_{idx}")
+            with c3:
+                unidade_auto = insumo_para_un.get(item.get("insumo", ""), "")
+                st.text_input("Unidade", value=unidade_auto, disabled=True, key=f"un_{idx}")
+                item["unidade"] = unidade_auto
+            with c4:
+                item["obs"] = st.text_input("Observação (opcional)", value=item.get("obs", ""), key=f"obs_{idx}")
+
+        colr1, colr2 = st.columns([1, 6])
+        with colr1:
+            if st.button(f"🗑️ Remover ingrediente #{idx+1}", key=f"rm_{idx}"):
+                st.session_state["ingredientes"].pop(idx)
+                st.rerun()
+
+# Adicionar ingrediente
 if st.button("➕ Adicionar ingrediente", use_container_width=True):
     st.session_state["ingredientes"].append({"insumo": "", "quantidade": 0.0, "unidade": "", "obs": ""})
     st.rerun()
+
+# =========================================================
+# Botão final de salvar ficha completa
+# =========================================================
+if st.button("💾 Salvar Ficha Técnica Completa", use_container_width=True):
+    if not nome_prato.strip():
+        st.error("Informe o nome do prato.")
+        st.stop()
+    if categoria == "— selecione —":
+        st.error("Selecione uma categoria válida.")
+        st.stop()
+    ingredientes_validos = [i for i in st.session_state["ingredientes"]
+                            if i.get("insumo") and float(i.get("quantidade", 0)) > 0]
+    if not ingredientes_validos:
+        st.error("Adicione ao menos um ingrediente.")
+        st.stop()
+
+    fichas = carregar_tabela(FICHAS_CSV)
+    novo = {
+        "nome_prato": nome_prato.strip(),
+        "codigo_interno": codigo_interno.strip(),
+        "codigo_sistema": codigo_sistema.strip(),
+        "codigo_pdv": codigo_pdv.strip(),
+        "categoria": categoria,
+        "rendimento_total": rendimento_total,
+        "peso_por_porcao": peso_por_porcao,
+        "responsavel": responsavel.strip(),
+        "ingredientes_json": json.dumps(ingredientes_validos, ensure_ascii=False),
+        "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    fichas = pd.concat([fichas, pd.DataFrame([novo])], ignore_index=True)
+    salvar_tabela(fichas, FICHAS_CSV)
+    st.success(f"Ficha técnica de **{novo['nome_prato']}** salva com sucesso! (FT {novo['codigo_interno']})")
 
 # =========================================================
 # Rodapé
@@ -230,7 +232,7 @@ v_texto, v_ref = random.choice(versiculos)
 st.markdown(
     f"""
     <div id='fichapp-footer'>
-      <div class='left'>🧩 FichApp v1.2.0 — última atualização: {datetime.now().strftime('%Y-%m-%d')}</div>
+      <div class='left'>🧩 FichApp v1.3.0 — última atualização: {datetime.now().strftime('%Y-%m-%d')}</div>
       <div class='right'><em>“{v_texto}”</em> — <strong>{v_ref}</strong></div>
     </div>
     """,
