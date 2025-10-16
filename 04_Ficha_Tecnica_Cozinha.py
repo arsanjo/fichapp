@@ -22,17 +22,20 @@ DARK_CSS = """
 .block-container { padding-top: 2rem; padding-bottom: 2rem; }
 h1, h2, h3, h4 { font-weight: 700; }
 .st-expander { border: 1px solid #e5e7eb; border-radius: 10px; }
-.stButton>button, .stForm form button[kind="primary"]{ background: #0f172a; color: #fff; border: 0; border-radius: 10px; padding: .6rem 1rem; }
-.stButton>button:hover, .stForm form button[kind="primary"]{ background: #1e293b; }
-#fichapp-footer { margin-top: 24px; padding: 16px 18px; border-radius: 12px; background: #0b1220; color: #e5e7eb; font-size: 0.92rem; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.stButton>button, .stForm form button[kind="primary"]{
+  background: #0f172a; color: #fff; border: 0; border-radius: 10px; padding: .6rem 1rem;
+}
+.stButton>button:hover, .stForm form button[kind="primary"]{
+  background: #1e293b;
+}
+#fichapp-footer {
+  margin-top: 24px; padding: 16px 18px; border-radius: 12px;
+  background: #0b1220; color: #e5e7eb; font-size: 0.92rem;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+}
 #fichapp-footer .left { font-weight: 600; }
 #fichapp-footer .right { opacity: .85; }
-.badge { display:inline-block; padding:.12rem .5rem; border-radius:999px; border:1px solid #334155; font-size:.75rem; color:#e2e8f0; }
 .small { font-size: .85rem; color: #94a3b8; }
-.table-like { width: 100%; border-collapse: collapse; }
-.table-like th, .table-like td { border-bottom: 1px dashed #334155; padding: .35rem .25rem; font-size: .92rem; }
-.table-like th { text-align: left; color: #93c5fd; }
-.code-hint { background: #0b1220; border:1px solid #1f2937; padding:.5rem .75rem; border-radius: .5rem; }
 </style>
 """
 st.markdown(DARK_CSS, unsafe_allow_html=True)
@@ -55,12 +58,9 @@ if os.path.exists(VERSAO_PATH):
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
 
-COMPRAS_CSV = os.path.join(DATA_DIR, "compras_insumos.csv")      # já existente (Cadastro de Insumos)
-FICHAS_CSV  = os.path.join(DATA_DIR, "fichas_tecnicas.csv")      # NOVO repositório das fichas
+COMPRAS_CSV = os.path.join(DATA_DIR, "compras_insumos.csv")
+FICHAS_CSV = os.path.join(DATA_DIR, "fichas_tecnicas.csv")
 
-# =========================================================
-# Inicialização dos arquivos
-# =========================================================
 if (not os.path.exists(FICHAS_CSV)) or os.stat(FICHAS_CSV).st_size == 0:
     cols = [
         "nome_prato","codigo_interno","codigo_sistema","codigo_pdv","categoria",
@@ -80,13 +80,10 @@ def carregar_tabela(path: str) -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()
 
-
 def salvar_tabela(df: pd.DataFrame, path: str):
     df.to_csv(path, index=False)
     st.cache_data.clear()
 
-
-# Prefixos por categoria – ajustável conforme a organização interna (exemplo inicial)
 PREFIXOS = {
     "Hossomaki": 13,
     "Uramaki": 14,
@@ -97,11 +94,7 @@ PREFIXOS = {
     "Yakissoba": 51,
 }
 
-
 def proximo_codigo_interno(categoria: str) -> str:
-    """Gera código sequencial por categoria, mantendo padrão PREFIXO + 2 dígitos.
-    Se não houver prefixo definido, usa 99.
-    """
     fichas = carregar_tabela(FICHAS_CSV)
     prefixo = PREFIXOS.get(categoria, 99)
     prefixo_str = str(prefixo)
@@ -120,39 +113,23 @@ def proximo_codigo_interno(categoria: str) -> str:
         prox = 1
     return f"{prefixo}{prox:02d}"
 
-
 # =========================================================
-# Estado da UI
+# Estado inicial
 # =========================================================
-def _ensure_state():
-    defaults = {
-        "ingredientes": [  # lista de linhas: {insumo, quantidade, unidade, obs}
-            {"insumo": "", "quantidade": 0.0, "unidade": "", "obs": ""},
-        ],
-        "categoria_sel": "Uramaki",
-        "codigo_interno_lock": True,
-    }
-    for k, v in defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
+if "ingredientes" not in st.session_state:
+    st.session_state["ingredientes"] = []
 
-_ensure_state()
-
-# Dados de insumos (para popular selectbox)
 insumos_df = carregar_tabela(COMPRAS_CSV)
-
-# Mapas auxiliares
 insumos_opcoes = []
 insumo_para_un = {}
+
 if not insumos_df.empty:
-    # usamos a coluna "insumo_resumo" para exibir, e pegamos unidade de "un_med"
     for _, row in insumos_df.iterrows():
         nome = str(row.get("insumo_resumo", "")).strip()
         un = str(row.get("un_med", "")).strip()
         if nome:
             insumos_opcoes.append(nome)
-            if nome not in insumo_para_un:
-                insumo_para_un[nome] = un
+            insumo_para_un[nome] = un
 
 # =========================================================
 # Cabeçalho
@@ -161,21 +138,16 @@ st.markdown("<h1>Ficha Técnica — Parte da Cozinha</h1>", unsafe_allow_html=Tr
 
 with st.form("ficha_cozinha"):
     cab1, cab2 = st.columns(2)
-
     with cab1:
-        nome_prato = st.text_input("Nome do prato", placeholder="Ex.: Uramaki Salmão Filadélfia")
+        nome_prato = st.text_input("Nome do prato")
         categoria = st.selectbox("Categoria / Grupo", options=list(PREFIXOS.keys()) + ["Outros"], index=1)
-        rendimento_total = st.number_input("Rendimento total (nº de porções)", min_value=0.0, value=0.0, step=0.5)
-        peso_por_porcao = st.number_input("Peso médio por porção (g/ml) — opcional", min_value=0.0, value=0.0, step=1.0)
-        responsavel = st.text_input("Responsável pela elaboração", placeholder="Nome de quem criou / revisou")
+        rendimento_total = st.number_input("Rendimento total (nº de porções)", min_value=0.0, value=0.0)
+        peso_por_porcao = st.number_input("Peso médio por porção (g/ml)", min_value=0.0, value=0.0)
+        responsavel = st.text_input("Responsável pela elaboração")
 
     with cab2:
-        # Código Interno (FT) — sugerido automaticamente por categoria, mas editável
-        if st.session_state.get("categoria_sel") != categoria:
-            st.session_state["categoria_sel"] = categoria
         sugestao_codigo = proximo_codigo_interno(categoria)
-        codigo_interno = st.text_input("Código Interno (FT)", value=sugestao_codigo, help="Gerado automaticamente por categoria; pode ajustar manualmente.")
-
+        codigo_interno = st.text_input("Código Interno (FT)", value=sugestao_codigo)
         codigo_sistema = st.text_input("Código Sistema (opcional)")
         codigo_pdv = st.text_input("Código PDV (opcional)")
         atualizado_em = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -184,120 +156,86 @@ with st.form("ficha_cozinha"):
     st.divider()
 
     # =========================================================
-    # Ingredientes – lista dinâmica
+    # Ingredientes — exibição da lista atual
     # =========================================================
     st.markdown("### 🧾 Ingredientes (vinculados ao cadastro de insumos)")
-
-    # Tabela de entrada
+    if not st.session_state["ingredientes"]:
+        st.info("Nenhum ingrediente adicionado ainda.")
     for idx, item in enumerate(st.session_state["ingredientes"]):
-        with st.expander(f"Ingrediente #{idx+1}", expanded=True if idx < 2 else False):
+        with st.expander(f"Ingrediente #{idx+1}", expanded=True):
             c1, c2, c3, c4 = st.columns([3, 1.2, 1.2, 2])
             with c1:
-                escolha = st.selectbox(
-                    "Insumo", options=["— selecione —"] + insumos_opcoes, index=0 if not item.get("insumo") else (["— selecione —"] + insumos_opcoes).index(item.get("insumo")), key=f"ins_{idx}")
-                item["insumo"] = escolha if escolha != "— selecione —" else ""
+                item["insumo"] = st.selectbox(
+                    "Insumo",
+                    options=["— selecione —"] + insumos_opcoes,
+                    index=0 if not item.get("insumo") else insumos_opcoes.index(item.get("insumo")) + 1,
+                    key=f"ins_{idx}"
+                )
             with c2:
                 item["quantidade"] = st.number_input("Quantidade", min_value=0.0, value=float(item.get("quantidade", 0.0)), step=0.01, key=f"qt_{idx}")
             with c3:
                 unidade_auto = insumo_para_un.get(item.get("insumo", ""), "")
-                item["unidade"] = unidade_auto
                 st.text_input("Unidade", value=unidade_auto, disabled=True, key=f"un_{idx}")
+                item["unidade"] = unidade_auto
             with c4:
                 item["obs"] = st.text_input("Observação (opcional)", value=item.get("obs", ""), key=f"obs_{idx}")
 
-            # Remover ingrediente
-            rem_col1, rem_col2 = st.columns([1, 5])
-            with rem_col1:
-                if st.button("🗑️ Remover", key=f"rm_{idx}"):
-                    st.session_state["ingredientes"].pop(idx)
-                    st.rerun()
-
-    # Adicionar ingrediente
-    if st.button("➕ Adicionar ingrediente"):
-        st.session_state["ingredientes"].append({"insumo": "", "quantidade": 0.0, "unidade": "", "obs": ""})
-        st.rerun()
-
     st.divider()
 
     # =========================================================
-    # Modo de preparo
+    # Modo de preparo e observações
     # =========================================================
     st.markdown("### 🍳 Modo de Preparo")
-    st.markdown("<span class='small'>Dica: descreva por etapas (preparo, montagem, finalização).</span>", unsafe_allow_html=True)
-    modo_preparo = st.text_area("Instruções", height=180, placeholder="1) ...\n2) ...\n3) ...")
-
-    st.divider()
-
-    # =========================================================
-    # Observações técnicas
-    # =========================================================
+    modo_preparo = st.text_area("Descreva as etapas de preparo", height=180)
     st.markdown("### 🧪 Observações Técnicas")
-    cobs1, cobs2 = st.columns(2)
-    with cobs1:
-        tempo_preparo = st.number_input("Tempo total de preparo (min)", min_value=0.0, value=0.0, step=5.0)
-        equipamentos = st.text_input("Equipamentos / Utensílios", placeholder="Ex.: faca, tábua, chapa, forno")
-    with cobs2:
-        temperatura = st.text_input("Temperatura (cocção/serviço)", placeholder="Ex.: 180°C / 4°C")
-        armazenamento = st.text_input("Armazenamento / Validade", placeholder="Ex.: resfriado por 24h")
-
-    obs_tecnicas = st.text_area("Pontos de atenção (opcional)", height=100, placeholder="Ex.: não ferver o molho; finalizar na hora; conservar resfriado...")
+    tempo_preparo = st.number_input("Tempo total (min)", min_value=0.0, value=0.0)
+    equipamentos = st.text_input("Equipamentos / Utensílios")
+    temperatura = st.text_input("Temperatura de cocção/serviço")
+    armazenamento = st.text_input("Armazenamento / Validade")
+    obs_tecnicas = st.text_area("Pontos de atenção", height=100)
 
     st.divider()
+    salvar = st.form_submit_button("💾 Salvar Ficha Técnica", use_container_width=True)
 
-    # =========================================================
-    # Ações
-    # =========================================================
-    left, right = st.columns([1, 1])
-    salvar = left.form_submit_button("💾 Salvar Ficha Técnica", use_container_width=True)
-    imprimir = right.form_submit_button("🖨️ Gerar PDF (versão cozinha)", use_container_width=True)
+if st.button("➕ Adicionar ingrediente", use_container_width=True):
+    st.session_state["ingredientes"].append({"insumo": "", "quantidade": 0.0, "unidade": "", "obs": ""})
+    st.rerun()
 
-    if salvar:
-        # validação mínima
-        if not nome_prato.strip():
-            st.error("Informe o nome do prato.")
-            st.stop()
-        if not categoria:
-            st.error("Selecione a categoria.")
-            st.stop()
-        if not codigo_interno.strip():
-            st.error("Código interno (FT) é obrigatório.")
-            st.stop()
+if salvar:
+    if not nome_prato.strip():
+        st.error("Informe o nome do prato.")
+        st.stop()
+    ingredientes_validos = [i for i in st.session_state["ingredientes"] if i.get("insumo") and float(i.get("quantidade", 0)) > 0]
+    if not ingredientes_validos:
+        st.error("Adicione ao menos um ingrediente com quantidade.")
+        st.stop()
 
-        # filtra ingredientes válidos
-        ingredientes_validos = [i for i in st.session_state["ingredientes"] if i.get("insumo") and float(i.get("quantidade", 0)) > 0]
-        if not ingredientes_validos:
-            st.error("Adicione ao menos um ingrediente com quantidade.")
-            st.stop()
-
-        fichas = carregar_tabela(FICHAS_CSV)
-        novo = {
-            "nome_prato": nome_prato.strip(),
-            "codigo_interno": codigo_interno.strip(),
-            "codigo_sistema": codigo_sistema.strip(),
-            "codigo_pdv": codigo_pdv.strip(),
-            "categoria": categoria,
-            "rendimento_total": rendimento_total,
-            "peso_por_porcao": peso_por_porcao,
-            "responsavel": responsavel.strip(),
-            "modo_preparo": modo_preparo,
-            "obs_tecnicas": obs_tecnicas,
-            "tempo_preparo": tempo_preparo,
-            "temperatura": temperatura,
-            "equipamentos": equipamentos,
-            "armazenamento": armazenamento,
-            "foto_path": "",
-            "ingredientes_json": json.dumps(ingredientes_validos, ensure_ascii=False),
-            "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        fichas = pd.concat([fichas, pd.DataFrame([novo])], ignore_index=True)
-        salvar_tabela(fichas, FICHAS_CSV)
-        st.success(f"Ficha técnica de **{novo['nome_prato']}** salva com sucesso! (FT {novo['codigo_interno']})")
-
-    if imprimir:
-        st.info("Em breve: exportação/print limpo apenas com a versão de cozinha (sem custos).")
+    fichas = carregar_tabela(FICHAS_CSV)
+    novo = {
+        "nome_prato": nome_prato.strip(),
+        "codigo_interno": codigo_interno.strip(),
+        "codigo_sistema": codigo_sistema.strip(),
+        "codigo_pdv": codigo_pdv.strip(),
+        "categoria": categoria,
+        "rendimento_total": rendimento_total,
+        "peso_por_porcao": peso_por_porcao,
+        "responsavel": responsavel.strip(),
+        "modo_preparo": modo_preparo,
+        "obs_tecnicas": obs_tecnicas,
+        "tempo_preparo": tempo_preparo,
+        "temperatura": temperatura,
+        "equipamentos": equipamentos,
+        "armazenamento": armazenamento,
+        "foto_path": "",
+        "ingredientes_json": json.dumps(ingredientes_validos, ensure_ascii=False),
+        "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    fichas = pd.concat([fichas, pd.DataFrame([novo])], ignore_index=True)
+    salvar_tabela(fichas, FICHAS_CSV)
+    st.success(f"Ficha técnica de **{novo['nome_prato']}** salva com sucesso! (FT {novo['codigo_interno']})")
 
 # =========================================================
-# Rodapé com versão + versículo (padrão FichAPP)
+# Rodapé
 # =========================================================
 versiculos = [
     ("E tudo quanto fizerdes, fazei-o de todo o coração, como ao Senhor.", "Colossenses 3:23"),
@@ -305,11 +243,6 @@ versiculos = [
     ("Confia no Senhor de todo o teu coração.", "Provérbios 3:5"),
     ("Tudo posso naquele que me fortalece.", "Filipenses 4:13"),
     ("Sede fortes e corajosos, o Senhor está convosco.", "Josué 1:9"),
-    ("O amor jamais acaba.", "1 Coríntios 13:8"),
-    ("O Senhor é a minha luz e a minha salvação.", "Salmo 27:1"),
-    ("Lâmpada para os meus pés é a tua palavra.", "Salmo 119:105"),
-    ("O choro pode durar uma noite, mas a alegria vem pela manhã.", "Salmo 30:5"),
-    ("Entrega o teu caminho ao Senhor; confia nele, e ele o fará.", "Salmo 37:5"),
 ]
 v_texto, v_ref = random.choice(versiculos)
 st.markdown(
